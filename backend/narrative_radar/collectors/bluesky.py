@@ -5,8 +5,8 @@
 - 삭제: 게시물 삭제 이벤트, 계정 비활성화·삭제 이벤트가 오면 원문을 지운다
   (Bluesky 개발자 가이드라인, DATA_POLICY 12).
 - 지표: 공개 AppView의 getPosts로 좋아요·답글·리포스트 수를 다시 확인한다.
-- 중단: 연결이 거부되거나 끊기면 다시 붙지 않고 멈춘다 (DATA_POLICY 5). 재개할 때는 마지막
-  커서부터 이어 받으며, 늦게 받은 글은 backfill로 표시한다.
+- 중단: 차단 신호면 바로 멈춘다. 연결이 끊기면 마지막 위치부터 최대 3번 이어 받고, 그래도 안 되면
+  멈춘다 (DATA_POLICY 5, DECISIONS D1-2). 10분 넘게 늦게 받은 글은 backfill로 표시한다.
 - 이벤트 봉투(envelope) 구조가 예상과 다르면 멈춘다. 개별 사용자가 만든 레코드의 필드가
   이상한 것은 흔하므로 그 글만 건너뛰고 센다.
 """
@@ -200,8 +200,25 @@ def jetstream_url(base: str, cursor_time_us: int | None) -> str:
     return f"{base}?{urlencode(params)}"
 
 
+class _Dropped(Exception):
+    """연결이 끊김(재연결 대상)."""
+
+
+# 재연결 전에 기다리는 시간. 횟수를 넘기면 멈춘다 (DECISIONS D1-2).
+RECONNECT_DELAYS_SECONDS = (5.0, 15.0, 45.0)
+# 이만큼 안정적으로 연결돼 있었으면 재연결 횟수를 처음부터 다시 센다.
+STABLE_CONNECTION_SECONDS = 600.0
+# 재연결할 때 이만큼 앞에서부터 다시 받는다. 겹친 이벤트는 저장 단계에서 걸러진다.
+RESUME_OVERLAP_US = 5_000_000
+
+
 class JetstreamStream:
-    """웹소켓 연결 하나를 유지하며 이벤트를 넘긴다. 문제가 생기면 다시 붙지 않고 멈춘다."""
+    """웹소켓 연결 하나를 유지하며 이벤트를 넘긴다.
+
+    - 차단 신호(핸드셰이크 401/403/429)나 프로토콜 이상(JSON이 아닌 메시지)이면 바로 멈춘다.
+    - 연결이 끊기거나 서버 오류(핸드셰이크 5xx)면 같은 연결 정보로 마지막 위치부터 이어 받는다.
+      최대 3번까지이고, 넘으면 멈춘다. IP·서버를 바꾸지 않는다.
+    """
 
     def __init__(
         self,
@@ -209,46 +226,81 @@ class JetstreamStream:
         guard: BlockGuard,
         base_url: str = DEFAULT_JETSTREAM,
         connect: Connector | None = None,
+        reconnect_delays: Sequence[float] = RECONNECT_DELAYS_SECONDS,
+        sleep: Callable[[float], None] | None = None,
+        monotonic: Callable[[], float] | None = None,
     ) -> None:
         if "mozilla" in user_agent.lower():
             raise ValueError("user agent must identify this project")
+        import time
+
         self.user_agent = user_agent
         self.guard = guard
         self.base_url = base_url
         self._connect = connect
+        self.reconnect_delays = tuple(reconnect_delays)
+        self._sleep = sleep or time.sleep
+        self._monotonic = monotonic or time.monotonic
         self.bytes_received = 0  # 대역폭 측정용 (M2)
+        self.reconnects = 0
+        self.last_time_us: int | None = None
 
     def events(self, cursor_time_us: int | None) -> Iterator[Any]:
-        import json
-
-        from websockets.exceptions import ConnectionClosed, InvalidStatus, WebSocketException
-
         connect = self._connect
         if connect is None:
             from websockets.sync.client import connect as ws_connect
 
             connect = ws_connect
 
-        self.guard.check()
-        url = jetstream_url(self.base_url, cursor_time_us)
+        self.last_time_us = cursor_time_us
+        attempts = 0
+        while True:
+            self.guard.check()
+            started = self._monotonic()
+            resume = None if self.last_time_us is None else self.last_time_us - RESUME_OVERLAP_US
+            try:
+                yield from self._one_connection(connect, resume)
+            except _Dropped as dropped:
+                if self._monotonic() - started >= STABLE_CONNECTION_SECONDS:
+                    attempts = 0
+                if attempts >= len(self.reconnect_delays):
+                    self._stop(
+                        TripKind.ERROR,
+                        f"{dropped} (gave up after {attempts} reconnects)",
+                    )
+                self._sleep(self.reconnect_delays[attempts])
+                attempts += 1
+                self.reconnects += 1
+
+    def _one_connection(self, connect: Connector, cursor: int | None) -> Iterator[Any]:
+        import json
+
+        from websockets.exceptions import ConnectionClosed, InvalidStatus, WebSocketException
+
+        url = jetstream_url(self.base_url, cursor)
         try:
             with connect(url, user_agent_header=self.user_agent, open_timeout=20) as ws:
                 for message in _iter_messages(ws):
                     self.bytes_received += len(message)
                     try:
-                        yield json.loads(message)
+                        event = json.loads(message)
                     except ValueError as e:
                         self._stop(TripKind.ERROR, f"non-JSON message from jetstream: {e}")
+                    if isinstance(event, dict) and isinstance(event.get("time_us"), int):
+                        self.last_time_us = event["time_us"]
+                    yield event
         except InvalidStatus as e:
             status = e.response.status_code
-            kind = TripKind.BLOCKED if status in (401, 403, 429) else TripKind.ERROR
-            self._stop(kind, f"jetstream handshake rejected: HTTP {status}")
+            if status in (401, 403, 429):
+                self._stop(TripKind.BLOCKED, f"jetstream handshake rejected: HTTP {status}")
+            if status >= 500:
+                raise _Dropped(f"jetstream handshake failed: HTTP {status}") from e
+            self._stop(TripKind.ERROR, f"jetstream handshake rejected: HTTP {status}")
         except ConnectionClosed as e:
-            self._stop(TripKind.ERROR, f"jetstream connection closed: {e}")
+            raise _Dropped(f"jetstream connection closed: {e}") from e
         except (OSError, TimeoutError, WebSocketException) as e:
-            self._stop(TripKind.ERROR, f"jetstream connection failed: {type(e).__name__}: {e}")
-        # 서버가 정상 종료해도 실시간 수집이 끊긴 것이므로 멈춘다.
-        self._stop(TripKind.ERROR, "jetstream stream ended")
+            raise _Dropped(f"jetstream connection failed: {type(e).__name__}: {e}") from e
+        raise _Dropped("jetstream stream ended")
 
     def _stop(self, kind: TripKind, reason: str) -> NoReturn:
         self.guard.trip(kind, reason)

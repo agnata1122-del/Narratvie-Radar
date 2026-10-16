@@ -161,35 +161,113 @@ def fake_connect(ws, seen):
     return connect
 
 
-def test_stream_yields_events_then_stops_when_connection_drops():
+def sequenced_connect(sockets, seen):
+    """연결할 때마다 다음 소켓(또는 예외)을 돌려준다."""
+    queue = list(sockets)
+
+    def connect(url, **kwargs):
+        seen.append((url, kwargs))
+        item = queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    return connect
+
+
+def make_stream(sockets, seen, guard=None, clock_step=0.0):
+    t = {"now": 0.0}
+    slept: list[float] = []
+
+    def monotonic():
+        t["now"] += clock_step
+        return t["now"]
+
+    stream = JetstreamStream(
+        "NarrativeRadar/test",
+        guard or BlockGuard(),
+        connect=sequenced_connect(sockets, seen),
+        sleep=slept.append,
+        monotonic=monotonic,
+    )
+    return stream, slept
+
+
+def drop():
+    return ConnectionClosedError(None, None)
+
+
+def test_dropped_connection_resumes_from_last_event_with_overlap():
     seen = []
-    ws = FakeWebSocket([json.dumps(post_event("nvidia"))], ConnectionClosedError(None, None))
-    guard = BlockGuard()
-    stream = JetstreamStream("NarrativeRadar/test", guard, connect=fake_connect(ws, seen))
+    first = FakeWebSocket([json.dumps(post_event("nvidia", at=NOW))], drop())
+    second = FakeWebSocket([json.dumps(post_event("nvidia again", rkey="3k2"))], drop())
+    stream, slept = make_stream([first, second], seen)
     events = stream.events(cursor_time_us=123)
-    assert next(events)["kind"] == "commit"
-    with pytest.raises(CollectionBlocked):
-        next(events)
+    assert next(events)["commit"]["rkey"] == "3kexample01"
+    assert next(events)["commit"]["rkey"] == "3k2"
+
+    cursors = [parse_qs(urlsplit(url).query).get("cursor") for url, _ in seen]
+    assert cursors[0] == [str(123 - 5_000_000)]
+    assert cursors[1] == [str(_us(NOW) - 5_000_000)]  # 마지막으로 받은 이벤트 5초 전부터
+    assert slept == [5.0]
+    assert stream.reconnects == 1
+    assert all(kw["user_agent_header"] == "NarrativeRadar/test" for _, kw in seen)
+
+
+def test_gives_up_after_three_reconnects():
+    seen = []
+    sockets = [FakeWebSocket([], drop()) for _ in range(4)]
+    guard = BlockGuard()
+    stream, slept = make_stream(sockets, seen, guard)
+    with pytest.raises(CollectionBlocked, match="gave up after 3 reconnects"):
+        next(stream.events(None))
+    assert slept == [5.0, 15.0, 45.0]
+    assert len(seen) == 4
     assert guard.tripped_kind == TripKind.ERROR
-    url, kwargs = seen[0]
-    q = parse_qs(urlsplit(url).query)
-    assert q == {"wantedCollections": ["app.bsky.feed.post"], "cursor": ["123"]}
-    assert kwargs["user_agent_header"] == "NarrativeRadar/test"
     # 멈춘 뒤에는 다시 연결하지 않는다
     with pytest.raises(CollectionBlocked):
-        next(stream.events(cursor_time_us=None))
-    assert len(seen) == 1
+        next(stream.events(None))
+    assert len(seen) == 4
 
 
-@pytest.mark.parametrize(("status", "kind"), [(429, TripKind.BLOCKED), (502, TripKind.ERROR)])
-def test_rejected_handshake_stops(status, kind):
-    def connect(url, **kwargs):
-        raise InvalidStatus(Response(status, "x", None))
-
-    guard = BlockGuard()
+def test_stable_connection_resets_reconnect_budget():
+    seen = []
+    # 매 연결이 10분 넘게 유지된 것처럼 시계를 진행시킨다
+    sockets = [FakeWebSocket([], drop()) for _ in range(5)] + [
+        InvalidStatus(Response(403, "x", None))
+    ]
+    stream, slept = make_stream(sockets, seen, clock_step=700.0)
     with pytest.raises(CollectionBlocked):
-        next(JetstreamStream("NarrativeRadar/test", guard, connect=connect).events(None))
-    assert guard.tripped_kind == kind
+        next(stream.events(None))
+    assert slept == [5.0] * 5
+    assert len(seen) == 6
+
+
+@pytest.mark.parametrize("status", [401, 403, 429])
+def test_block_signal_at_handshake_stops_without_reconnecting(status):
+    seen = []
+    guard = BlockGuard()
+    stream, slept = make_stream([InvalidStatus(Response(status, "x", None))], seen, guard)
+    with pytest.raises(CollectionBlocked):
+        next(stream.events(None))
+    assert guard.tripped_kind == TripKind.BLOCKED
+    assert slept == [] and len(seen) == 1
+
+
+def test_server_error_at_handshake_is_retried():
+    seen = []
+    ok = FakeWebSocket([json.dumps(post_event("nvidia"))], drop())
+    stream, slept = make_stream([InvalidStatus(Response(502, "x", None)), ok], seen)
+    assert next(stream.events(None))["kind"] == "commit"
+    assert slept == [5.0]
+
+
+def test_other_client_error_at_handshake_stops():
+    guard = BlockGuard()
+    stream, _ = make_stream([InvalidStatus(Response(404, "x", None))], [], guard)
+    with pytest.raises(CollectionBlocked):
+        next(stream.events(None))
+    assert guard.tripped_kind == TripKind.ERROR
 
 
 def test_non_json_message_stops():

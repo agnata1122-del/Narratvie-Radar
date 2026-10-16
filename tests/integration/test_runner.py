@@ -222,7 +222,9 @@ def test_bluesky_stream_saves_matches_applies_deletes_and_stops_on_drop(
             bsky_event("", "a3", op="delete"),
         ]
     )
-    stream = JetstreamStream("NarrativeRadar/test", c.guard(), connect=lambda url, **kw: ws)
+    stream = JetstreamStream(
+        "NarrativeRadar/test", c.guard(), connect=lambda url, **kw: ws, reconnect_delays=()
+    )
     handler = JetstreamHandler(AuthorHasher(SALT), clock, ["NVIDIA", "NVDA"])
     with pytest.raises(CollectionBlocked), c.run(RunKind.COLLECT, {}) as run_id:
         consume_bluesky(c, stream, handler, run_id)

@@ -290,7 +290,10 @@ def consume_bluesky(
                 status,
                 documents_listed=handler.stats.posts_seen,
                 documents_fetched=saved,
-                note=json.dumps(handler.stats.__dict__ | {"bytes": stream.bytes_received}),
+                note=json.dumps(
+                    handler.stats.__dict__
+                    | {"bytes": stream.bytes_received, "reconnects": stream.reconnects}
+                ),
             )
         pending = []
         window_start = now
