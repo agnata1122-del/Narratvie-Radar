@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "DiscoveryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_depth_overflow": {
+          "default": false,
+          "title": "Allow Depth Overflow",
+          "type": "boolean"
+        },
+        "max_new_nodes_per_day": {
+          "default": 15,
+          "minimum": 0,
+          "title": "Max New Nodes Per Day",
+          "type": "integer"
+        },
+        "minimum_independent_evidence": {
+          "default": 2,
+          "minimum": 1,
+          "title": "Minimum Independent Evidence",
+          "type": "integer"
+        },
+        "require_relevance": {
+          "default": true,
+          "title": "Require Relevance",
+          "type": "boolean"
+        }
+      },
+      "title": "DiscoveryConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "관심사 설정 (PRD 8.1).",
+  "properties": {
+    "auto_expand": {
+      "default": true,
+      "title": "Auto Expand",
+      "type": "boolean"
+    },
+    "discovery": {
+      "$ref": "#/$defs/DiscoveryConfig"
+    },
+    "max_depth": {
+      "default": 2,
+      "maximum": 3,
+      "minimum": 0,
+      "title": "Max Depth",
+      "type": "integer"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "root_canonical_key": {
+      "title": "Root Canonical Key",
+      "type": "string"
+    },
+    "root_interest": {
+      "title": "Root Interest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "root_interest",
+    "root_canonical_key"
+  ],
+  "title": "InterestProfileConfig",
+  "type": "object"
+}

@@ -1,0 +1,236 @@
+{
+  "$defs": {
+    "CommentIn": {
+      "additionalProperties": false,
+      "properties": {
+        "author_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author Hash"
+        },
+        "body_text": {
+          "title": "Body Text",
+          "type": "string"
+        },
+        "external_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "External Id",
+          "type": "string"
+        },
+        "parent_external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent External Id"
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Published At"
+        }
+      },
+      "required": [
+        "external_id",
+        "body_text"
+      ],
+      "title": "CommentIn",
+      "type": "object"
+    },
+    "ContentAccessStatus": {
+      "enum": [
+        "permitted",
+        "unverified",
+        "metadata_only"
+      ],
+      "title": "ContentAccessStatus",
+      "type": "string"
+    },
+    "IngestMode": {
+      "enum": [
+        "live",
+        "backfill",
+        "manual_import"
+      ],
+      "title": "IngestMode",
+      "type": "string"
+    },
+    "MetricsIn": {
+      "additionalProperties": false,
+      "properties": {
+        "comment_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Comment Count"
+        },
+        "downvote_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Downvote Count"
+        },
+        "upvote_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Upvote Count"
+        },
+        "view_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "View Count"
+        }
+      },
+      "title": "MetricsIn",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "author_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Author Hash"
+    },
+    "body_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Body Text"
+    },
+    "comments": {
+      "items": {
+        "$ref": "#/$defs/CommentIn"
+      },
+      "title": "Comments",
+      "type": "array"
+    },
+    "content_access_status": {
+      "$ref": "#/$defs/ContentAccessStatus"
+    },
+    "external_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "External Id",
+      "type": "string"
+    },
+    "ingest_mode": {
+      "$ref": "#/$defs/IngestMode"
+    },
+    "metrics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MetricsIn"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "published_at": {
+      "format": "date-time",
+      "title": "Published At",
+      "type": "string"
+    },
+    "source_adapter_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Source Adapter Id",
+      "type": "string"
+    },
+    "source_url": {
+      "maxLength": 1000,
+      "pattern": "^https?://",
+      "title": "Source Url",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_adapter_id",
+    "external_id",
+    "source_url",
+    "title",
+    "published_at",
+    "observed_at",
+    "content_access_status",
+    "ingest_mode"
+  ],
+  "title": "DocumentIn",
+  "type": "object"
+}

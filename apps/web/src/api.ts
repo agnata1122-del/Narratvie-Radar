@@ -8,6 +8,7 @@ export type SourceStatus = {
 export type Health = {
   status: 'ok'
   version: string
+  database: 'ok' | 'uninitialized'
   sources: SourceStatus[]
 }
 

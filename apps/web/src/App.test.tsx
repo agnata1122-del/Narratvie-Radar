@@ -24,6 +24,7 @@ describe('App shell', () => {
         Response.json({
           status: 'ok',
           version: '0.2.0',
+          database: 'ok',
           sources: [
             {
               id: 'dcinside_stockus',

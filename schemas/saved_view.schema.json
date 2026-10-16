@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "ViewFilters": {
+      "additionalProperties": false,
+      "properties": {
+        "min_relevance": {
+          "default": 0.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Relevance",
+          "type": "number"
+        },
+        "new_nodes_only": {
+          "default": false,
+          "title": "New Nodes Only",
+          "type": "boolean"
+        },
+        "node_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Node Types",
+          "type": "array"
+        },
+        "time_range": {
+          "default": "7d",
+          "enum": [
+            "24h",
+            "3d",
+            "7d",
+            "30d",
+            "all"
+          ],
+          "title": "Time Range",
+          "type": "string"
+        },
+        "topics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Topics",
+          "type": "array"
+        }
+      },
+      "title": "ViewFilters",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "저장된 필터 조합 (PRD 13.3). 매매 전략과는 별개 객체다 (PRD 13.4).",
+  "properties": {
+    "depth": {
+      "default": 2,
+      "maximum": 3,
+      "minimum": 0,
+      "title": "Depth",
+      "type": "integer"
+    },
+    "filters": {
+      "$ref": "#/$defs/ViewFilters"
+    },
+    "interest": {
+      "title": "Interest",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "view_name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "View Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "view_name",
+    "interest"
+  ],
+  "title": "SavedViewIn",
+  "type": "object"
+}

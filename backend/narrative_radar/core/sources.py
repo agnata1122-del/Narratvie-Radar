@@ -4,21 +4,8 @@
 """
 
 from dataclasses import dataclass
-from enum import StrEnum
 
-
-class SourceAccessStatus(StrEnum):
-    NOT_AUTHORIZED = "not_authorized"  # 어댑터는 있지만 수집하지 않음
-    TEST_MODE = "test_mode"  # 수동 import 등 테스트 데이터만
-    LIVE = "live"  # 라이브 수집 중
-    PAUSED = "paused"  # 사람이 멈춤
-    BLOCKED = "blocked"  # 차단 신호를 감지해 자동 중단됨. 사람이 확인 후 해제
-
-
-class SourceKind(StrEnum):
-    COMMUNITY = "community"
-    MARKET = "market"
-    OFFICIAL = "official"
+from narrative_radar.schemas.enums import SourceKind
 
 
 @dataclass(frozen=True)

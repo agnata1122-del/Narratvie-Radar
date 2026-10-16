@@ -6,7 +6,7 @@
 
 미래를 예측하는 도구가 아니라, 지금 일어나고 있지만 놓치기 쉬운 변화를 발견하는 도구입니다. 이 앱이 보여주는 내용은 투자 조언이 아닙니다.
 
-> **현재 상태: 개발 초기 (v0.2, M1 진행 중).** 라이브 수집은 꺼져 있습니다. 진행 상황은 [docs/ROADMAP.md](docs/ROADMAP.md)를 보세요.
+> **현재 상태: 개발 초기 (v0.2, M1 완료).** 라이브 수집은 꺼져 있습니다. 진행 상황은 [docs/ROADMAP.md](docs/ROADMAP.md)를 보세요.
 
 ## 문서
 
@@ -16,6 +16,7 @@
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 구현 중 정한 설계 결정과 PRD 변경 사항 |
 | [docs/DATA_POLICY.md](docs/DATA_POLICY.md) | 소스별 이용 조건 확인 결과와 수집기 규칙 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 데이터 흐름과 코드 위치 |
+| [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 테이블, 시간 필드, 추가만 허용하는 이력 테이블 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 마일스톤과 체크포인트 |
 
 ## 데이터에 대해
@@ -31,6 +32,7 @@
 ```bash
 make setup        # Python·웹 의존성 설치
 cp .env.example .env
+uv run nr db init # 로컬 DB 생성 (data/narrative_radar.db)
 
 make dev-api      # API 서버 (http://127.0.0.1:8000)
 make dev-web      # 웹앱 (http://127.0.0.1:5173, /api는 API 서버로 프록시)

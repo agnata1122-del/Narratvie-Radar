@@ -29,6 +29,8 @@ PREFIXES = frozenset(
         "wik",  # wiki_revisions
         "cmt",  # document_comments
         "als",  # node_aliases
+        "nca",  # narrative_claims
+        "pnd",  # profile_nodes
     }
 )
 

@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "ClaimExtract": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_status": {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        "excerpt": {
+          "description": "주장이 드러난 원문 일부",
+          "maxLength": 200,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "polarity": {
+          "$ref": "#/$defs/Polarity"
+        },
+        "predicate": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "stance": {
+          "$ref": "#/$defs/Stance"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject",
+        "predicate",
+        "object",
+        "polarity",
+        "stance",
+        "evidence_status",
+        "excerpt"
+      ],
+      "title": "ClaimExtract",
+      "type": "object"
+    },
+    "EdgeType": {
+      "enum": [
+        "RELATED_TO",
+        "PART_OF",
+        "BELONGS_TO",
+        "SUPPLIES_TO",
+        "COMPETES_WITH",
+        "AFFECTS",
+        "CLAIMED_CAUSE_OF",
+        "SUPPORTS",
+        "CONTRADICTS",
+        "CO_MENTIONED_WITH"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "EntityMention": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "기존 노드 목록에서 고른 키. 해당 없으면 null",
+          "title": "Canonical Key"
+        },
+        "name": {
+          "description": "원문에 나온 표기",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/NodeType"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "EntityMention",
+      "type": "object"
+    },
+    "EvidenceStatus": {
+      "description": "주장이 어떤 성격으로 제시됐는가 (원문 기준).",
+      "enum": [
+        "community_opinion",
+        "speculation",
+        "reported_fact",
+        "official_source"
+      ],
+      "title": "EvidenceStatus",
+      "type": "string"
+    },
+    "NodeType": {
+      "enum": [
+        "company",
+        "industry",
+        "technology",
+        "topic",
+        "event",
+        "narrative"
+      ],
+      "title": "NodeType",
+      "type": "string"
+    },
+    "Polarity": {
+      "enum": [
+        "growth_driver",
+        "constraint",
+        "neutral"
+      ],
+      "title": "Polarity",
+      "type": "string"
+    },
+    "Stance": {
+      "enum": [
+        "bullish",
+        "bearish",
+        "neutral",
+        "mixed"
+      ],
+      "title": "Stance",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/ClaimExtract"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/$defs/EntityMention"
+      },
+      "title": "Entities",
+      "type": "array"
+    },
+    "is_noise": {
+      "title": "Is Noise",
+      "type": "boolean"
+    },
+    "needs_review": {
+      "description": "판단이 불확실하면 true. 억지로 분류하지 않는다",
+      "title": "Needs Review",
+      "type": "boolean"
+    },
+    "relevance": {
+      "description": "관심사와의 관련성. 모델 출력 지표이며 보정된 확률이 아니다",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Relevance",
+      "type": "number"
+    },
+    "review_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Reason"
+    },
+    "stance": {
+      "$ref": "#/$defs/Stance"
+    },
+    "topics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Topics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "relevance",
+    "is_noise",
+    "entities",
+    "topics",
+    "stance",
+    "claims",
+    "needs_review"
+  ],
+  "title": "ClassificationOutput",
+  "type": "object"
+}

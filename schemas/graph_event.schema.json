@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "EdgeType": {
+      "enum": [
+        "RELATED_TO",
+        "PART_OF",
+        "BELONGS_TO",
+        "SUPPLIES_TO",
+        "COMPETES_WITH",
+        "AFFECTS",
+        "CLAIMED_CAUSE_OF",
+        "SUPPORTS",
+        "CONTRADICTS",
+        "CO_MENTIONED_WITH"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "EventCause": {
+      "enum": [
+        "observed_new",
+        "backfill",
+        "reprocess",
+        "source_added",
+        "user_action"
+      ],
+      "title": "EventCause",
+      "type": "string"
+    },
+    "EventType": {
+      "enum": [
+        "NODE_CREATED",
+        "NODE_DORMANT",
+        "NODE_REACTIVATED",
+        "NODE_MERGED",
+        "NODE_REJECTED",
+        "EDGE_CREATED",
+        "EDGE_CONFIRMED",
+        "EDGE_WEAKENED",
+        "EDGE_TYPE_CHANGED",
+        "EDGE_REJECTED",
+        "NARRATIVE_CREATED",
+        "NARRATIVE_STATE_CHANGED",
+        "WIKI_REVISED"
+      ],
+      "title": "EventType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "그래프 변화 이벤트 (PRD 10.2 + 변화 원인, DECISIONS D7).",
+  "properties": {
+    "available_at": {
+      "format": "date-time",
+      "title": "Available At",
+      "type": "string"
+    },
+    "cause": {
+      "$ref": "#/$defs/EventCause"
+    },
+    "edge_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Edge Id"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Event Time"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    },
+    "narrative_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Narrative Id"
+    },
+    "node_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Node Id"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "title": "Recorded At",
+      "type": "string"
+    },
+    "relation_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EdgeType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "source_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Node"
+    },
+    "target_node": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Node"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "cause",
+    "recorded_at",
+    "available_at",
+    "evidence_ids",
+    "run_id",
+    "payload"
+  ],
+  "title": "GraphEventOut",
+  "type": "object"
+}
