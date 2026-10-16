@@ -34,6 +34,8 @@ class DocumentIn(BaseModel):
 
     source_adapter_id: str = Field(min_length=1, max_length=64)
     external_id: str = Field(min_length=1, max_length=128)
+    parent_external_id: str | None = Field(default=None, max_length=128)
+    thread_external_id: str | None = Field(default=None, max_length=128)
     source_url: str = Field(pattern=r"^https?://", max_length=1000)
     title: str
     body_text: str | None = None

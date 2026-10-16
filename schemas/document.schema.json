@@ -199,6 +199,19 @@
       "title": "Observed At",
       "type": "string"
     },
+    "parent_external_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent External Id"
+    },
     "published_at": {
       "format": "date-time",
       "title": "Published At",
@@ -215,6 +228,19 @@
       "pattern": "^https?://",
       "title": "Source Url",
       "type": "string"
+    },
+    "thread_external_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Thread External Id"
     },
     "title": {
       "title": "Title",
