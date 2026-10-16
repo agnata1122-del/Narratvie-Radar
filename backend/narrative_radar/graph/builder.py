@@ -30,6 +30,7 @@ from narrative_radar.db.models import (
     NarrativeClaim,
     Node,
     NodeAlias,
+    NodeMention,
     RawDocument,
 )
 from narrative_radar.graph import fingerprint
@@ -161,6 +162,8 @@ class GraphBuilder:
             node_id, created = self._node_for(r, doc, now, cause)
             node_ids[_res_key(r)] = node_id
             report.nodes_created += created
+        for node_id in set(node_ids.values()):
+            self._mention(node_id, doc, now)
 
         touched: set[str] = set()
         for proposed in cs.claims:
@@ -314,6 +317,29 @@ class GraphBuilder:
         self._add_alias(node.node_id, r.mention.name, alias, now)
         self._event(EventType.NODE_CREATED, cause, now, doc, node_id=node.node_id)
         return node.node_id, True
+
+    def _mention(self, node_id: str, doc: Document, now: datetime) -> None:
+        exists = self.session.scalar(
+            sa.select(NodeMention.mention_id).where(
+                NodeMention.node_id == node_id, NodeMention.document_id == doc.document_id
+            )
+        )
+        if exists:
+            return
+        self.session.add(
+            NodeMention(
+                mention_id=new_id("mnt", now),
+                node_id=node_id,
+                document_id=doc.document_id,
+                source_adapter_id=doc.source_adapter_id,
+                derivation_group_id=doc.derivation_group_id,
+                author_hash=doc.author_hash,
+                published_at=doc.published_at,
+                available_at=now,
+                run_id=self.run_id,
+            )
+        )
+        self.session.flush()
 
     def _add_alias(self, node_id: str, alias: str, normalized: str, now: datetime) -> None:
         exists = self.session.scalar(

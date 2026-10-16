@@ -31,6 +31,7 @@ PREFIXES = frozenset(
         "als",  # node_aliases
         "nca",  # narrative_claims
         "pnd",  # profile_nodes
+        "mnt",  # node_mentions
     }
 )
 

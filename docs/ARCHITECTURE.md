@@ -46,6 +46,8 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
 | `backend/narrative_radar/classifiers/` | 세션 분류 내보내기·검증(`session.py`), 분류 지침(`guidelines/`), 온톨로지 문맥, 규칙 기반 기준 분류기 |
 | `backend/narrative_radar/graph/` | 그래프 반영: 개체 정규화(`resolve.py`), 변경안(`changeset.py`), 반영과 관계 확정(`builder.py`), 복사 판정 지문(`fingerprint.py`) |
 | `backend/narrative_radar/discovery/` | 관심사 그래프 자동 확장: 탐색 깊이, 하루 예산, 검토 대기 |
+| `backend/narrative_radar/temporal/` | 시점 t의 그래프 상태(`state.py`), 내러티브 상태(`narratives.py`), 달라진 점(`changes.py`) |
+| `backend/narrative_radar/wiki/` | 사실 기반 위키 리비전 |
 | `backend/narrative_radar/api/` | FastAPI 앱 |
 | `backend/narrative_radar/cli.py` | `nr` 명령줄 도구 |
 | `apps/web/` | React 웹앱 |

@@ -36,8 +36,9 @@ uv run nr classify pending --limit 50
 #      data/work/classify/out.jsonl을 쓴다
 uv run nr classify ingest data/work/classify/out.jsonl --model <세션 모델 이름>
 
-# 3. 그래프 갱신 (위키는 M6에서 추가)
+# 3. 그래프·위키 갱신
 uv run nr graph build
+uv run nr wiki refresh
 
 # 4. 점검
 uv run nr sources list

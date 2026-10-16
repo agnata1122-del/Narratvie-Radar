@@ -60,6 +60,7 @@ APPEND_ONLY_TABLES = (
     "edge_evidence",
     "graph_events",
     "narrative_claims",
+    "node_mentions",
     "node_metric_buckets",
     "profile_nodes",
     "wiki_revisions",
@@ -366,6 +367,23 @@ class Edge(Base):
     created_at: Mapped[datetime]
     available_at: Mapped[datetime]
     created_run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
+
+
+class NodeMention(Base):
+    """글이 노드를 언급한 기록. 관심도(크기)와 확산 지표를 시점별로 계산하는 데 쓴다 (D9, D10)."""
+
+    __tablename__ = "node_mentions"
+    __table_args__ = (sa.UniqueConstraint("node_id", "document_id"),)
+
+    mention_id: Mapped[str] = mapped_column(ID, primary_key=True)
+    node_id: Mapped[str] = mapped_column(fk("nodes.node_id"), index=True)
+    document_id: Mapped[str] = mapped_column(fk("documents.document_id"), index=True)
+    source_adapter_id: Mapped[str] = mapped_column(fk("source_adapters.source_adapter_id"))
+    derivation_group_id: Mapped[str | None] = mapped_column(fk("derivation_groups.group_id"))
+    author_hash: Mapped[str | None] = mapped_column(sa.String(64))
+    published_at: Mapped[datetime]
+    available_at: Mapped[datetime] = mapped_column(index=True)
+    run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
 
 
 class EdgeEvidence(Base):

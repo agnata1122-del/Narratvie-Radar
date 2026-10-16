@@ -6,6 +6,7 @@ from narrative_radar import __version__
 from narrative_radar.cli_classify import classify_app
 from narrative_radar.cli_collect import collect_app
 from narrative_radar.cli_graph import graph_app
+from narrative_radar.cli_wiki import wiki_app
 from narrative_radar.core.config import get_settings
 
 app = typer.Typer(help="Narrative Radar 명령줄 도구", no_args_is_help=True)
@@ -18,6 +19,7 @@ app.add_typer(sources_app, name="sources")
 app.add_typer(collect_app, name="collect")
 app.add_typer(classify_app, name="classify")
 app.add_typer(graph_app, name="graph")
+app.add_typer(wiki_app, name="wiki")
 
 
 @app.command()
