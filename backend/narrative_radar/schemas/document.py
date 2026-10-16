@@ -17,6 +17,7 @@ class MetricsIn(BaseModel):
     view_count: int | None = Field(default=None, ge=0)
     upvote_count: int | None = Field(default=None, ge=0)
     downvote_count: int | None = Field(default=None, ge=0)
+    share_count: int | None = Field(default=None, ge=0)
 
 
 class CommentIn(BaseModel):

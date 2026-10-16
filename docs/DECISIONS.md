@@ -119,3 +119,5 @@ PRD v0.2를 구현하면서 정한 것, PRD와 달라진 것, 그 이유를 기�
 - **Bluesky 수집 방식**: Jetstream은 전체 공개 게시물을 실시간으로 보내므로 받은 뒤 로컬에서 NVDA 관련 글만 남긴다. 검색 API는 로그인이 필요하다는 보고가 있어 쓰지 않는다. 대역폭은 M2에서 잰다.
 - **삭제 반영**: 출처에서 지워진 글은 원문을 지운다(DATA_POLICY 12). 원문을 `raw_documents`에 따로 둔 이유가 이것이다. `documents` 행은 남기되 제목을 지우고 `deleted_observed_at`을 기록한다.
 - **보류**: Reddit(승인제), 네이버 검색 API, YouTube 댓글, StockTwits. 이유는 DATA_POLICY 1장.
+- **Bluesky 글 주소**: 글 주소와 링크에 계정 ID가 들어간다. 근거 링크와 삭제 이벤트 대조에 필요하므로 저장하고, 작성자 기준 처리는 `author_hash`로만 한다(DATA_POLICY 8 예외).
+- **Bluesky 게시 시각**: 사용자가 적는 `createdAt`은 과거·미래로 바꿀 수 있으므로 쓰지 않고, Jetstream이 이벤트를 받은 시각(`time_us`)을 `published_at`으로 쓴다.

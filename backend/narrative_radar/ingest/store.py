@@ -228,6 +228,7 @@ class DocumentStore:
                 view_count=metrics.view_count,
                 upvote_count=metrics.upvote_count,
                 downvote_count=metrics.downvote_count,
+                share_count=metrics.share_count,
                 collect_run_id=self.collect_run_id,
             )
         )

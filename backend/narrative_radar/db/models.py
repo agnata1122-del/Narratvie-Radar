@@ -219,6 +219,7 @@ class DocumentMetricSnapshot(Base):
     view_count: Mapped[int | None]
     upvote_count: Mapped[int | None]
     downvote_count: Mapped[int | None]
+    share_count: Mapped[int | None]  # 리포스트·인용 등 확산 지표 (Bluesky)
     collect_run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
 
 
