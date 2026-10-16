@@ -50,7 +50,7 @@ class HackerNewsCollector:
         self.client = client
         self.hasher = hasher
         self.clock = clock
-        self.terms = list(dict.fromkeys(t.strip() for t in terms if t.strip()))
+        self.terms = minimal_terms(terms)
         self.live_since = live_since
         self.first_lookback = first_lookback
         self.hits_per_page = hits_per_page
@@ -173,3 +173,14 @@ class HackerNewsCollector:
 
 def _str_or_none(value: object) -> str | None:
     return None if value is None else str(value)
+
+
+def minimal_terms(terms: Sequence[str]) -> list[str]:
+    """대소문자만 다른 검색어와, 다른 검색어를 포함하는 검색어는 뺀다
+    ("NVIDIA Corporation"은 "NVIDIA" 결과에 들어 있다). 검색어마다 요청이 하나씩 늘기 때문이다."""
+    by_key: dict[str, str] = {}
+    for t in terms:
+        key = normalize_text(t)
+        if key and key not in by_key:
+            by_key[key] = t.strip()
+    return [t for key, t in by_key.items() if not any(o != key and o in key for o in by_key)]

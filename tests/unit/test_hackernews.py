@@ -11,7 +11,7 @@ import pytest
 
 from narrative_radar.collectors.author import AuthorHasher
 from narrative_radar.collectors.guard import CollectionBlocked, TripKind
-from narrative_radar.collectors.hackernews import HackerNewsCollector
+from narrative_radar.collectors.hackernews import HackerNewsCollector, minimal_terms
 from narrative_radar.collectors.http import PoliteClient
 from narrative_radar.collectors.rate_limit import MinIntervalLimiter
 from narrative_radar.core.clock import FixedClock
@@ -174,3 +174,10 @@ def test_revisit_reads_story_metrics_but_not_comment_reply_counts():
     collector, _ = make(lambda r: httpx.Response(200, json=comment))
     revisit = collector.revisit("41000002")
     assert (revisit.metrics.upvote_count, revisit.metrics.comment_count) == (None, None)
+
+
+def test_terms_contained_in_other_terms_are_dropped():
+    assert minimal_terms(["NVIDIA", "NVDA", "NVIDIA Corporation", "nvidia", " "]) == [
+        "NVIDIA",
+        "NVDA",
+    ]
