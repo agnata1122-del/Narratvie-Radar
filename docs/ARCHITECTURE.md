@@ -41,7 +41,7 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
 | `backend/narrative_radar/core/` | 설정, 시계, ID, 소스 등록부 |
 | `backend/narrative_radar/schemas/` | Pydantic 스키마 (API·LLM 입출력, JSON Schema export) |
 | `backend/narrative_radar/db/` | SQLAlchemy 모델, 세션, 마이그레이션 |
-| `backend/narrative_radar/collectors/` | 소스별 어댑터, 레이트 리밋, 자동 중단 |
+| `backend/narrative_radar/collectors/` | 소스별 어댑터. `http.py`(유일한 HTTP 클라이언트: 최소 간격, robots.txt, 정직한 UA, GET만), `guard.py`(차단 감지 시 자동 중단), `author.py`(작성자 HMAC), `gate.py`(수집 허용 조건과 상태 변경) |
 | `backend/narrative_radar/api/` | FastAPI 앱 |
 | `backend/narrative_radar/cli.py` | `nr` 명령줄 도구 |
 | `apps/web/` | React 웹앱 |

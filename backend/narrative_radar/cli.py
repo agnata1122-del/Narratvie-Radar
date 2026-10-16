@@ -8,8 +8,10 @@ from narrative_radar.core.config import get_settings
 app = typer.Typer(help="Narrative Radar 명령줄 도구", no_args_is_help=True)
 db_app = typer.Typer(help="데이터베이스", no_args_is_help=True)
 schemas_app = typer.Typer(help="JSON Schema", no_args_is_help=True)
+sources_app = typer.Typer(help="데이터 소스 상태 (docs/DATA_POLICY.md)", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 app.add_typer(schemas_app, name="schemas")
+app.add_typer(sources_app, name="sources")
 
 
 @app.command()
@@ -71,6 +73,102 @@ def schemas_export(out_dir: Path = Path("schemas")) -> None:
 
     for path in write_all(out_dir):
         typer.echo(f"wrote {path}")
+
+
+def _sessions():  # type: ignore[no-untyped-def]
+    from narrative_radar.db.session import make_engine, make_session_factory
+
+    return make_session_factory(make_engine(get_settings().database_url))
+
+
+@sources_app.command("list")
+def sources_list() -> None:
+    """소스별 상태와 수집 가능 여부."""
+    import sqlalchemy as sa
+
+    from narrative_radar.collectors.gate import can_collect
+    from narrative_radar.db.models import SourceAdapter
+
+    settings = get_settings()
+    with _sessions()() as session:
+        for a in session.scalars(
+            sa.select(SourceAdapter).order_by(SourceAdapter.source_adapter_id)
+        ):
+            decision = can_collect(settings, a)
+            typer.echo(
+                f"{a.source_adapter_id}\t{a.access_status.value}\tlive_enabled={a.live_enabled}"
+                f"\tcollect={'yes' if decision.allowed else 'no'} ({decision.reason})"
+            )
+
+
+@sources_app.command("enable")
+def sources_enable(
+    source_id: str,
+    accept_data_policy: bool = typer.Option(
+        False,
+        "--accept-data-policy",
+        help="docs/DATA_POLICY.md의 확인 결과와 규칙을 읽고 위험을 감수한다는 확인",
+    ),
+) -> None:
+    """소스를 live로 바꾼다. 실제 수집은 전체 스위치도 켜져 있어야 한다."""
+    from narrative_radar.collectors.gate import set_status
+    from narrative_radar.core.clock import SystemClock
+    from narrative_radar.db.session import session_scope
+    from narrative_radar.schemas.enums import SourceAccessStatus
+
+    if not accept_data_policy:
+        typer.echo("docs/DATA_POLICY.md를 읽은 뒤 --accept-data-policy를 붙여 다시 실행하세요.")
+        raise typer.Exit(code=2)
+    with session_scope(_sessions()) as session:
+        set_status(
+            session,
+            source_id,
+            SourceAccessStatus.LIVE,
+            "enabled by owner via CLI (--accept-data-policy)",
+            SystemClock(),
+            live_enabled=True,
+        )
+    typer.echo(f"{source_id}: live")
+
+
+@sources_app.command("pause")
+def sources_pause(source_id: str, reason: str = "paused by owner") -> None:
+    """수집을 멈춘다."""
+    from narrative_radar.collectors.gate import set_status
+    from narrative_radar.core.clock import SystemClock
+    from narrative_radar.db.session import session_scope
+    from narrative_radar.schemas.enums import SourceAccessStatus
+
+    with session_scope(_sessions()) as session:
+        set_status(
+            session, source_id, SourceAccessStatus.PAUSED, reason, SystemClock(), live_enabled=False
+        )
+    typer.echo(f"{source_id}: paused")
+
+
+@sources_app.command("reset")
+def sources_reset(
+    source_id: str, reason: str = typer.Option(..., help="차단 원인 확인 내용")
+) -> None:
+    """차단(blocked) 상태를 해제해 paused로 돌린다. 다시 수집하려면 enable을 실행한다."""
+    from narrative_radar.collectors.gate import get_adapter, set_status
+    from narrative_radar.core.clock import SystemClock
+    from narrative_radar.db.session import session_scope
+    from narrative_radar.schemas.enums import SourceAccessStatus
+
+    with session_scope(_sessions()) as session:
+        if get_adapter(session, source_id).access_status != SourceAccessStatus.BLOCKED:
+            typer.echo(f"{source_id} is not blocked")
+            raise typer.Exit(code=1)
+        set_status(
+            session,
+            source_id,
+            SourceAccessStatus.PAUSED,
+            f"block reviewed: {reason}",
+            SystemClock(),
+            live_enabled=False,
+        )
+    typer.echo(f"{source_id}: paused (block reviewed)")
 
 
 if __name__ == "__main__":
