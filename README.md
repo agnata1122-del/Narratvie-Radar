@@ -6,7 +6,7 @@
 
 미래를 예측하는 도구가 아니라, 지금 일어나고 있지만 놓치기 쉬운 변화를 발견하는 도구입니다. 이 앱이 보여주는 내용은 투자 조언이 아닙니다.
 
-> **현재 상태: 개발 초기 (v0.2, M1 완료).** 라이브 수집은 꺼져 있습니다. 진행 상황은 [docs/ROADMAP.md](docs/ROADMAP.md)를 보세요.
+> **현재 상태: 개발 초기 (v0.2).** 수집기(Bluesky, HN)까지 만들었고, 실제 수집 확인(M2)을 앞두고 있습니다. 라이브 수집은 기본값이 꺼짐입니다. 진행 상황은 [docs/ROADMAP.md](docs/ROADMAP.md)를 보세요.
 
 ## 문서
 
@@ -18,11 +18,13 @@
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 데이터 흐름과 코드 위치 |
 | [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 테이블, 시간 필드, 추가만 허용하는 이력 테이블 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 마일스톤과 체크포인트 |
+| [docs/SOURCE_FEASIBILITY.md](docs/SOURCE_FEASIBILITY.md) | 수집 가능성 확인 절차와 결과 |
 
 ## 데이터에 대해
 
-- 수집 대상: 디시인사이드 미국주식갤러리, 네이버페이 증권 해외주식 토론(NVDA).
-- 두 소스 모두 공식적으로 허가된 자동 수집 경로가 없습니다. 자세한 확인 결과와 수집기가 지키는 규칙(읽기 전용, 저빈도, 차단 시 자동 중단, 작성자 정보 비저장)은 [DATA_POLICY.md](docs/DATA_POLICY.md)에 있습니다.
+- **지금 수집하는 소스**: 공식 API가 있는 Bluesky(실시간 공개 스트림)와 Hacker News. 둘 다 영어권이라, 화면과 평가에서 어느 커뮤니티에서 관측된 것인지 밝힙니다.
+- **나중에 추가할 소스**: 디시인사이드 미국주식갤러리, 네이버페이 증권 해외주식 토론. 공식 수집 경로가 없어 데이터 이용 문의 중입니다.
+- 수집기는 읽기 전용·저빈도로 동작하고, 문제가 생기면 첫 번째에서 바로 멈추며, 작성자 정보는 해시로만 남기고, 출처에서 지워진 글은 원문을 지웁니다. 자세한 내용은 [DATA_POLICY.md](docs/DATA_POLICY.md)에 있습니다.
 - **이 저장소에는 실제 게시글을 커밋하지 않습니다.** 수집 데이터는 로컬 `data/`에만 저장됩니다.
 
 ## 개발 환경
@@ -38,6 +40,16 @@ make dev-api      # API 서버 (http://127.0.0.1:8000)
 make dev-web      # 웹앱 (http://127.0.0.1:5173, /api는 API 서버로 프록시)
 
 make check        # 린트 + 테스트
+```
+
+수집 실행 방법과 확인 항목은 [docs/SOURCE_FEASIBILITY.md](docs/SOURCE_FEASIBILITY.md)에 있습니다.
+
+```bash
+uv run nr sources list                      # 소스별 상태와 수집 가능 여부
+uv run nr collect hackernews --loop         # HN 수집
+uv run nr collect bluesky                   # Bluesky 스트림 수집
+uv run nr collect bluesky-metrics --loop    # Bluesky 지표 재방문
+uv run nr sources report                    # 수집 현황 요약
 ```
 
 ## 구조

@@ -216,6 +216,7 @@ class JetstreamStream:
         self.guard = guard
         self.base_url = base_url
         self._connect = connect
+        self.bytes_received = 0  # 대역폭 측정용 (M2)
 
     def events(self, cursor_time_us: int | None) -> Iterator[Any]:
         import json
@@ -233,6 +234,7 @@ class JetstreamStream:
         try:
             with connect(url, user_agent_header=self.user_agent, open_timeout=20) as ws:
                 for message in _iter_messages(ws):
+                    self.bytes_received += len(message)
                     try:
                         yield json.loads(message)
                     except ValueError as e:

@@ -227,13 +227,12 @@ class SourceHealth(Base):
     """수집 상태 시계열. 공백 구간의 관심도 하락을 신호로 오인하지 않기 위해 쓴다 (D10)."""
 
     __tablename__ = "source_health"
-    __table_args__ = (
-        sa.UniqueConstraint("source_adapter_id", "window_start"),
-        sa.CheckConstraint("window_end > window_start", name="window_order"),
-    )
+    __table_args__ = (sa.CheckConstraint("window_end > window_start", name="window_order"),)
 
     health_id: Mapped[str] = mapped_column(ID, primary_key=True)
-    source_adapter_id: Mapped[str] = mapped_column(fk("source_adapters.source_adapter_id"))
+    source_adapter_id: Mapped[str] = mapped_column(
+        fk("source_adapters.source_adapter_id"), index=True
+    )
     window_start: Mapped[datetime]
     window_end: Mapped[datetime]
     status: Mapped[SourceHealthStatus] = mapped_column(str_enum(SourceHealthStatus))

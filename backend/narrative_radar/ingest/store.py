@@ -45,7 +45,9 @@ class DocumentStore:
         self.parser_version = parser_version
         self._adapters: dict[str, SourceAdapter] = {}
 
-    def save(self, doc: DocumentIn) -> StoreResult:
+    def save(self, doc: DocumentIn, snapshot_if_existing: bool = True) -> StoreResult:
+        """snapshot_if_existing=False: 이미 저장된 글이면 지표를 쌓지 않는다. 검색 결과가 겹쳐
+        같은 글이 다시 걸릴 때 스냅샷이 재방문 일정과 어긋나게 쌓이지 않도록 한다."""
         adapter = self._adapter(doc.source_adapter_id)
         existing = self._find(doc.source_adapter_id, doc.external_id)
         observed_at = ensure_utc(doc.observed_at)
@@ -115,7 +117,8 @@ class DocumentStore:
 
         if keep_text:
             self._add_comments(document.document_id, doc, observed_at)
-        snapshot_added = self._add_snapshot(document.document_id, observed_at, doc.metrics)
+        metrics = doc.metrics if (created or snapshot_if_existing) else None
+        snapshot_added = self._add_snapshot(document.document_id, observed_at, metrics)
         return StoreResult(document.document_id, created, changed, snapshot_added)
 
     def add_metrics(

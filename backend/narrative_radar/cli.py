@@ -3,6 +3,7 @@ from pathlib import Path
 import typer
 
 from narrative_radar import __version__
+from narrative_radar.cli_collect import collect_app
 from narrative_radar.core.config import get_settings
 
 app = typer.Typer(help="Narrative Radar 명령줄 도구", no_args_is_help=True)
@@ -12,6 +13,7 @@ sources_app = typer.Typer(help="데이터 소스 상태 (docs/DATA_POLICY.md)", 
 app.add_typer(db_app, name="db")
 app.add_typer(schemas_app, name="schemas")
 app.add_typer(sources_app, name="sources")
+app.add_typer(collect_app, name="collect")
 
 
 @app.command()
@@ -99,6 +101,16 @@ def sources_list() -> None:
                 f"{a.source_adapter_id}\t{a.access_status.value}\tlive_enabled={a.live_enabled}"
                 f"\tcollect={'yes' if decision.allowed else 'no'} ({decision.reason})"
             )
+
+
+@sources_app.command("report")
+def sources_report(hours: int = typer.Option(24, help="최근 몇 시간을 볼지")) -> None:
+    """수집 현황: 글 수(실시간·백필), 삭제, 스냅샷, 수집 지연, 시간대별 글 수, 상태 기록."""
+    from narrative_radar.core.clock import SystemClock
+    from narrative_radar.ingest.report import render, source_report
+
+    with _sessions()() as session:
+        typer.echo(render(source_report(session, SystemClock().now(), hours)))
 
 
 @sources_app.command("enable")
