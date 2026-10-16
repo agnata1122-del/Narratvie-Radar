@@ -31,7 +31,7 @@ function renderInline(text: string, opts: MarkdownOptions = {}, keyPrefix = 'i')
           <button
             key={key}
             type="button"
-            className="text-nr-accent underline-offset-2 hover:underline"
+            className="font-medium text-nr-link underline decoration-nr-link/30 underline-offset-2 transition-colors hover:decoration-nr-link"
             onClick={() => opts.onNodeLink?.(name)}
           >
             {name}
@@ -46,7 +46,7 @@ function renderInline(text: string, opts: MarkdownOptions = {}, keyPrefix = 'i')
       const href = safeHref(m[4])
       out.push(
         href ? (
-          <a key={key} href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-nr-accent hover:underline">
+          <a key={key} href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-nr-link hover:underline">
             {m[3]}
           </a>
         ) : (
@@ -63,7 +63,7 @@ function renderInline(text: string, opts: MarkdownOptions = {}, keyPrefix = 'i')
 export function Markdown({ source, ...opts }: { source: string } & MarkdownOptions) {
   const blocks = source.split(/\n{2,}/)
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 break-keep">
       {blocks.map((block, b) => {
         const lines = block.split('\n')
         const nodes: ReactNode[] = []
@@ -72,7 +72,7 @@ export function Markdown({ source, ...opts }: { source: string } & MarkdownOptio
           if (items.length === 0) return
           const listKey = `l-${b}-${nodes.length}`
           nodes.push(
-            <ul key={listKey} className="list-disc space-y-1 pl-4">
+            <ul key={listKey} className="space-y-1.5 pl-3.5 [&>li]:relative [&>li]:before:absolute [&>li]:before:top-[0.6em] [&>li]:before:-left-3 [&>li]:before:size-1 [&>li]:before:rounded-full [&>li]:before:bg-nr-border-strong">
               {items.map((item, i) => (
                 <li key={i}>{renderInline(item, opts, `${listKey}-${i}`)}</li>
               ))}

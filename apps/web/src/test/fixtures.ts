@@ -104,7 +104,20 @@ export function changes(since: string, until: string): ChangeReport {
 export function nodeDetail(id: string): NodeDetail {
   const label = frames.nodes[id]?.label ?? id
   return {
-    node: { node_id: id, label, node_type: 'company', status: 'active', membership: 'admitted', mentions_7d: 2, independent_7d: 2 },
+    node: {
+      node_id: id,
+      label,
+      node_type: 'company',
+      status: 'active',
+      membership: 'admitted',
+      depth: 1,
+      activity: 1.2,
+      mentions_7d: 2,
+      independent_7d: 2,
+      share_7d: 0.08,
+      first_seen: T1,
+      last_mention_at: T2,
+    },
     wiki: {
       version: 1,
       available_at: T1,

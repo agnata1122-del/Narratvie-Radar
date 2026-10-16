@@ -96,11 +96,21 @@ export type NodeDetail = {
     node_type: string
     status: string
     membership: string
+    depth: number | null
+    activity: number
     mentions_7d: number
     independent_7d: number
+    share_7d: number
+    first_seen: string
+    last_mention_at: string | null
   } | null
   wiki: { version: number; available_at: string; generator: string; sections: WikiSection[] } | null
-  narrative: { proposition: string; state: string | null } | null
+  narrative: {
+    proposition: string
+    state: string | null
+    supports_recent: number
+    contradicts_recent: number
+  } | null
 }
 
 export type EdgeDetail = {

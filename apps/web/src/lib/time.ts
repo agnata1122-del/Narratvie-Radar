@@ -21,3 +21,12 @@ export function defaultRange(start: string | null, now: string, days: number): {
   const from = Math.max(earliest, end - days * 86_400_000)
   return { start: new Date(Math.min(from, end - 3_600_000)).toISOString(), end: new Date(end).toISOString() }
 }
+
+/** 기준 시각에서 얼마나 전인지 ("3시간 전"). 기준보다 뒤면 "방금". */
+export function relativeTime(iso: string, reference: string): string {
+  const diff = (new Date(reference).getTime() - new Date(iso).getTime()) / 60_000
+  if (diff < 1) return '방금'
+  if (diff < 60) return `${Math.round(diff)}분 전`
+  if (diff < 60 * 24) return `${Math.round(diff / 60)}시간 전`
+  return `${Math.round(diff / 60 / 24)}일 전`
+}

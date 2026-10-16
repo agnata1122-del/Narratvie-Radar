@@ -3,14 +3,16 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react
 import { api, type ChangeItem, type Frames } from './api'
 import ChangesPanel from './components/ChangesPanel'
 import type { Highlight, Selection } from './components/GraphView'
+import EmptyRadar from './components/EmptyRadar'
 import Header from './components/Header'
 import Inspector from './components/Inspector'
 import Legend from './components/Legend'
 import Timeline, { type RangeDays } from './components/Timeline'
-import { Muted, Panel } from './components/ui'
+import { Muted, Panel, Skeleton, Switch } from './components/ui'
 import { changeKey, type ChangeWindow } from './lib/changes'
 import { nodeIdsByLabel } from './lib/frames'
 import { computeLayout } from './lib/layout'
+import { useTheme } from './lib/theme'
 import { addHours, defaultRange, formatTime } from './lib/time'
 
 // 범위별 프레임 수: 3일 1시간, 7일 2시간, 14일 4시간, 30일 8시간 간격
@@ -22,16 +24,8 @@ const GraphView = lazy(() => import('./components/GraphView'))
 
 const once = { staleTime: Infinity, refetchOnWindowFocus: false, retry: false } as const
 
-function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: string }) {
-  return (
-    <label className="flex cursor-pointer items-center gap-1 text-[11px] whitespace-nowrap text-nr-muted">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-[var(--nr-accent)]" />
-      {children}
-    </label>
-  )
-}
-
 export default function App() {
+  const theme = useTheme()
   const health = useQuery({ queryKey: ['health'], queryFn: ({ signal }) => api.health(signal) })
   const overview = useQuery({ queryKey: ['overview'], queryFn: ({ signal }) => api.overview(signal), ...once })
   // 방문 기록은 한 번만 남긴다 (StrictMode 두 번 마운트에도 요청 하나)
@@ -80,6 +74,9 @@ export default function App() {
     const timer = setTimeout(() => setCursor({ frames: f, i: index + 1 }), PLAY_INTERVAL_MS / speed)
     return () => clearTimeout(timer)
   }, [playing, f, index, speed])
+  const stepMs = PLAY_INTERVAL_MS / speed
+  // 재생 중에는 한 칸 시간 안에 옮겨 가고, 손으로 옮길 때는 조금 더 여유 있게 움직인다
+  const transitionMs = playing ? Math.min(800, Math.max(160, stepMs * 0.9)) : 560
   const togglePlay = () => {
     if (!playing && index >= last) setIndex(0)
     setPlaying(!playing)
@@ -88,6 +85,7 @@ export default function App() {
   const rootId = overview.data?.profile.root_node_id ?? null
   const positions = useMemo(() => (f ? computeLayout(f, rootId) : {}), [f, rootId])
   const labelToId = useMemo(() => nodeIdsByLabel(f), [f])
+  const times = useMemo(() => f?.frames.map((x) => x.t) ?? [], [f])
 
   const [selection, setSelection] = useState<Selection>(null)
   const [highlight, setHighlight] = useState<Highlight>(null)
@@ -132,10 +130,17 @@ export default function App() {
   const uninitialized = health.data?.database === 'uninitialized'
 
   return (
-    <div className="flex min-h-full flex-col md:h-full">
-      <Header overview={overview.data} health={health.data} healthPending={health.isPending} healthError={health.isError} />
+    <div className="flex min-h-full flex-col lg:h-full">
+      <Header
+        overview={overview.data}
+        health={health.data}
+        healthPending={health.isPending}
+        healthError={health.isError}
+        theme={theme.mode}
+        onTheme={theme.setMode}
+      />
 
-      <main className="grid flex-1 grid-cols-1 gap-px bg-nr-border md:min-h-0 md:grid-cols-[280px_1fr_360px]">
+      <main className="grid flex-1 grid-cols-1 gap-px bg-nr-border lg:min-h-0 lg:grid-cols-[300px_minmax(0,1fr)_380px]">
         <Panel title="달라진 점">
           {hasGraph ? (
             <ChangesPanel
@@ -149,31 +154,32 @@ export default function App() {
               onPick={pickChange}
             />
           ) : (
-            <div className="p-3">
+            <div className="p-4">
               <Muted>그래프가 생기면 지난 방문 이후 새로 관측된 것, 달라진 기존 이야기, 그 근거가 여기에 표시된다.</Muted>
             </div>
           )}
         </Panel>
 
         <Panel
-          title="선택한 커뮤니티에서 관측된 내러티브"
-          className="order-first md:order-none"
+          title="관측된 내러티브"
+          subtitle="선택한 커뮤니티 기준"
+          className="order-first lg:order-none"
           actions={
             hasGraph && (
               <>
-                <Toggle checked={showPending} onChange={setShowPending}>
-                  검토 대기 보기
-                </Toggle>
-                <Toggle checked={showCoMention} onChange={setShowCoMention}>
-                  함께 언급 선
-                </Toggle>
+                <Switch checked={showPending} onChange={setShowPending}>
+                  검토 대기
+                </Switch>
+                <Switch checked={showCoMention} onChange={setShowCoMention}>
+                  함께 언급
+                </Switch>
               </>
             )
           }
         >
-          <div className="relative h-[60vh] md:h-full">
+          <div className="relative h-[62vh] lg:h-full">
             {f && Object.keys(f.nodes).length > 0 ? (
-              <Suspense fallback={<div className="p-3"><Muted>그래프 준비 중…</Muted></div>}>
+              <Suspense fallback={<Skeleton className="absolute inset-4" />}>
                 <GraphView
                   frames={f}
                   frameIndex={index}
@@ -184,12 +190,24 @@ export default function App() {
                   showCoMention={showCoMention}
                   showPending={showPending}
                   onSelect={select}
+                  transitionMs={transitionMs}
+                  theme={theme.resolved}
                 />
+                {/* 재생 시점 워터마크: 시점이 바뀔 때마다 살짝 페이드된다 */}
+                {asOf && (
+                  <div className="pointer-events-none absolute top-3 left-4 select-none" aria-hidden="true">
+                    <div key={asOf} className="nr-fade text-[28px] leading-none font-semibold tracking-tight text-nr-text/10 tabular-nums">
+                      {formatTime(asOf)}
+                    </div>
+                    {playing && <div className="mt-1 text-[11px] font-medium text-nr-muted">재생 중 · {speed}×</div>}
+                  </div>
+                )}
                 <Legend />
               </Suspense>
             ) : (
-              <div className="flex h-full items-center justify-center p-6">
-                <div className="max-w-sm space-y-2 text-center">
+              <div className="nr-canvas-bg flex h-full items-center justify-center p-6">
+                <div className="nr-fade flex max-w-sm flex-col items-center gap-3 text-center">
+                  <EmptyRadar />
                   {(overview.isPending || frames.isFetching) && <Muted>불러오는 중…</Muted>}
                   {(overview.isError || uninitialized) && (
                     <Muted>
@@ -198,9 +216,9 @@ export default function App() {
                   )}
                   {(noData || (f && Object.keys(f.nodes).length === 0)) && (
                     <>
-                      <p className="text-sm font-medium text-nr-text">아직 그려질 그래프가 없다</p>
+                      <p className="text-sm font-semibold text-nr-text">아직 그려질 그래프가 없다</p>
                       <Muted>
-                        수집 → 분류 → 그래프 생성이 한 번 이상 돌아야 한다. 수집이 꺼져 있으면 위 소스 상태를 확인한다. 실행 순서는 docs/OPERATIONS.md 에 있다.
+                        수집 → 분류 → 그래프 생성이 한 번 이상 돌아야 한다. 수집이 꺼져 있으면 오른쪽 위 수집 상태를 확인한다. 실행 순서는 docs/OPERATIONS.md 에 있다.
                       </Muted>
                       {overview.data && <Muted>지금까지 수집한 글 {overview.data.counts.documents}건</Muted>}
                     </>
@@ -211,14 +229,14 @@ export default function App() {
           </div>
         </Panel>
 
-        <Panel title={asOf ? `위키 · 근거 (${formatTime(asOf)} 기준)` : '위키 · 근거'}>
+        <Panel title="위키 · 근거" subtitle={asOf ? `${formatTime(asOf)} 기준` : undefined}>
           {asOf && <Inspector selection={selection} asOf={asOf} frames={f} frameIndex={index} labelToId={labelToId} onSelect={select} />}
         </Panel>
       </main>
 
       {f && f.frames.length > 1 && (
         <Timeline
-          times={f.frames.map((x) => x.t)}
+          times={times}
           index={index}
           onIndex={(i) => {
             setPlaying(false)
@@ -236,6 +254,7 @@ export default function App() {
           events={events.data ?? []}
           gaps={gaps.data ?? []}
           previousSeenAt={previousSeenAt}
+          stepMs={stepMs}
         />
       )}
 

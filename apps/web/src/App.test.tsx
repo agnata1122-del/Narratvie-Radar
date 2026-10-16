@@ -66,7 +66,20 @@ describe('App', () => {
     stubApi()
     renderApp()
     expect(screen.getByRole('heading', { name: 'Narrative Radar' })).toBeInTheDocument()
+    // 요약 알약은 "수집 꺼짐", 펼치면 소스별 상태
     expect(await screen.findByText('Hacker News · 수집 꺼짐')).toBeInTheDocument()
+    expect(screen.getByText('수집 꺼짐')).toBeInTheDocument()
+  })
+
+  it('cycles the theme and remembers it on the page', async () => {
+    stubApi()
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /시스템 테마/ }))
+    expect(document.documentElement.dataset.theme).toBe('light')
+    fireEvent.click(screen.getByRole('button', { name: /밝은 테마/ }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    fireEvent.click(screen.getByRole('button', { name: /어두운 테마/ }))
+    expect(document.documentElement.dataset.theme).toBeUndefined()
   })
 
   it('shows a disconnected state when the API is unreachable', async () => {
@@ -86,11 +99,12 @@ describe('App', () => {
     stubApi()
     renderApp()
     expect(await screen.findByTestId('graph')).toHaveAttribute('data-frame', '2')
-    const fresh = await screen.findByRole('heading', { name: '새로 관측된 것' })
+    const fresh = await screen.findByRole('heading', { name: /새로 관측된 것/ })
     const list = within(fresh.parentElement!)
     expect(list.getByText('SK hynix')).toBeInTheDocument()
     expect(list.getByText('재분류')).toBeInTheDocument() // 새 관측이 아닌 변화는 원인 배지
-    expect(list.getAllByText(/확산 2건 · 독립 근거 2/)).toHaveLength(2)
+    // 확산 수와 독립 근거 수를 따로 보여준다
+    expect(list.getAllByText((_, el) => el?.tagName === 'SPAN' && !el.className && el.textContent === '독립 2 / 확산 2')).toHaveLength(2)
   })
 
   it('clicking a change opens the node wiki, and wiki links move to the linked node', async () => {
@@ -123,8 +137,8 @@ describe('App', () => {
     stubApi()
     renderApp()
     fireEvent.click(await screen.findByRole('button', { name: 'pick edge' }))
-    expect(await screen.findByText('“fixture excerpt”')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '원문 보기' })).toHaveAttribute('href', 'https://news.ycombinator.com/item?id=1')
+    expect(await screen.findByRole('link', { name: '원문 보기' })).toHaveAttribute('href', 'https://news.ycombinator.com/item?id=1')
+    expect(screen.getByText('“fixture excerpt”')).toBeInTheDocument()
     expect(screen.getByText(/작성자가 지운 글/)).toBeInTheDocument()
     expect(screen.getByText(/커뮤니티 의견 · 미검증/)).toBeInTheDocument()
   })

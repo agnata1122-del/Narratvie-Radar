@@ -9,6 +9,12 @@ export const NODE_TYPE_LABEL: Record<string, string> = {
   narrative: '내러티브',
 }
 
+export const SERIES_LABEL: Record<string, string> = {
+  entity: '기업·산업',
+  concept: '기술·이슈·사건',
+  narrative: '내러티브',
+}
+
 export const RELATION_LABEL: Record<string, string> = {
   RELATED_TO: '관련',
   PART_OF: '일부',

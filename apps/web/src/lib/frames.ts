@@ -1,4 +1,4 @@
-import type { Frames } from '../api'
+import type { Frames, GraphEventRow } from '../api'
 
 /** 프레임 시각 중 iso 이하인 마지막 프레임. 모두 이후면 0. */
 export function frameIndexAt(frames: Frames['frames'], iso: string): number {
@@ -26,4 +26,25 @@ export function nodeIdsByLabel(frames: Frames | undefined): Map<string, string> 
     if (!map.has(meta.label)) map.set(meta.label, id)
   }
   return map
+}
+
+export type Bin = { start: string; end: string; total: number; nodes: number; edges: number; narratives: number }
+
+/** 프레임 사이 구간마다 그래프 변화 수를 센다 (위키 갱신은 뺀다) */
+export function binEvents(times: string[], events: GraphEventRow[]): Bin[] {
+  const bins: Bin[] = times.slice(1).map((end, i) => ({ start: times[i], end, total: 0, nodes: 0, edges: 0, narratives: 0 }))
+  const edges = times.map((t) => new Date(t).getTime())
+  for (const e of events) {
+    if (e.type === 'WIKI_REVISED') continue
+    const t = new Date(e.t).getTime()
+    let i = edges.findIndex((x) => x >= t) - 1
+    if (i < 0) i = 0
+    const b = bins[Math.min(i, bins.length - 1)]
+    if (!b) continue
+    b.total += 1
+    if (e.type.startsWith('NARRATIVE')) b.narratives += 1
+    else if (e.type.startsWith('EDGE')) b.edges += 1
+    else b.nodes += 1
+  }
+  return bins
 }
