@@ -9,6 +9,7 @@ class SourceAccessStatus(StrEnum):
     LIVE = "live"
     PAUSED = "paused"  # 사람이 멈춤
     BLOCKED = "blocked"  # 차단 신호를 감지해 자동 중단. 사람이 확인 후 해제
+    STOPPED = "stopped"  # 오류(5xx, 연결 실패, 파싱 실패 등)로 자동 중단. 사람이 확인 후 해제
 
 
 class SourceKind(StrEnum):

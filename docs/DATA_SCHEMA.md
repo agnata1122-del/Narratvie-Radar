@@ -23,7 +23,7 @@
 | 테이블 | 역할 |
 |---|---|
 | `interest_profiles` | 관심사와 자동 탐색 설정 (root, depth, 일일 신규 노드 예산, 최소 독립 근거 수) |
-| `source_adapters` | 소스별 상태(`not_authorized / test_mode / live / paused / blocked`)와 `live_enabled` |
+| `source_adapters` | 소스별 상태(`not_authorized / test_mode / live / paused / blocked / stopped`)와 `live_enabled` |
 | `pipeline_runs` | 수집·분석 실행 단위. mode(`live / retrospective`), model·prompt·schema·code 버전 |
 
 ### 원천 데이터

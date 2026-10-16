@@ -179,7 +179,7 @@ class Document(Base):
 
 
 class RawDocument(Base):
-    """원문 본문. 로컬 DB에만 존재하며 외부로 그대로 내보내지 않는다 (DATA_POLICY 8–9)."""
+    """원문 본문. 로컬 DB에만 존재하며 외부로 그대로 내보내지 않는다 (DATA_POLICY 9–10)."""
 
     __tablename__ = "raw_documents"
 

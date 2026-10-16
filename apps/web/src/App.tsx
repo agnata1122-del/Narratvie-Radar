@@ -7,6 +7,7 @@ const STATUS_LABEL: Record<SourceStatus['access_status'], string> = {
   live: 'LIVE',
   paused: '일시 중지',
   blocked: '차단 감지 · 중단됨',
+  stopped: '오류 · 중단됨',
 }
 
 function Chip({ children }: { children: React.ReactNode }) {

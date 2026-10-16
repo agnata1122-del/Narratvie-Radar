@@ -3,7 +3,7 @@ import hmac
 
 
 class AuthorHasher:
-    """작성자 식별자를 저장하지 않고 HMAC만 남긴다 (DATA_POLICY 7).
+    """작성자 식별자를 저장하지 않고 HMAC만 남긴다 (DATA_POLICY 8).
 
     같은 salt 안에서는 같은 작성자를 알아볼 수 있어 독립 근거를 셀 수 있지만,
     salt 없이는 원래 식별자를 되돌릴 수 없다.

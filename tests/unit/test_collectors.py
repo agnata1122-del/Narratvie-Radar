@@ -2,8 +2,8 @@ import httpx
 import pytest
 
 from narrative_radar.collectors.author import AuthorHasher
-from narrative_radar.collectors.guard import BlockGuard, CollectionBlocked
-from narrative_radar.collectors.http import PoliteClient, RobotsDisallowed, RobotsUnavailable
+from narrative_radar.collectors.guard import BlockGuard, CollectionBlocked, TripKind
+from narrative_radar.collectors.http import PoliteClient, RobotsDisallowed
 from narrative_radar.collectors.rate_limit import MinIntervalLimiter
 
 UA = "NarrativeRadar/0.2 (+https://github.com/agnata1122-del/Narratvie-Radar)"
@@ -88,39 +88,72 @@ def test_robots_crawl_delay_raises_interval():
     assert ft.slept[-1] == pytest.approx(10.0)
 
 
-def test_missing_robots_means_no_restriction_but_server_error_means_stop():
+def test_missing_robots_means_no_restriction():
     client, _, _ = make_client(site({}, robots=404))
     assert client.get("https://example.com/private/page").status_code == 200
 
+
+def test_unreadable_robots_stops_collection_before_any_page_request():
     client, calls, _ = make_client(site({}, robots=503))
-    with pytest.raises(RobotsUnavailable):
+    with pytest.raises(CollectionBlocked):
         client.get("https://example.com/a")
     assert [c.url.path for c in calls] == ["/robots.txt"]
+    assert client.guard.tripped_kind == TripKind.ERROR
 
 
 @pytest.mark.parametrize("status", [401, 403, 429])
-def test_block_status_trips_guard_and_stops_all_further_requests(status):
+def test_block_status_stops_immediately_as_blocked(status):
     client, calls, _ = make_client(site({"/a": httpx.Response(status)}))
-    client.get("https://example.com/a")
-    assert client.guard.tripped
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/a")
+    assert client.guard.tripped_kind == TripKind.BLOCKED
     with pytest.raises(CollectionBlocked):
         client.get("https://example.com/b")
     assert [c.url.path for c in calls] == ["/robots.txt", "/a"]
 
 
-def test_captcha_page_trips_guard():
+@pytest.mark.parametrize("status", [400, 405, 500, 502, 503])
+def test_any_other_error_stops_on_first_occurrence(status):
+    client, calls, _ = make_client(site({"/a": httpx.Response(status)}))
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/a")
+    assert client.guard.tripped_kind == TripKind.ERROR
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/b")
+    assert [c.url.path for c in calls] == ["/robots.txt", "/a"]
+    assert client.stats.failures == 1
+
+
+def test_network_error_stops_immediately():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="")
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    client, calls, _ = make_client(handler)
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/a")
+    assert client.guard.tripped_kind == TripKind.ERROR
+    assert "ConnectTimeout" in client.guard.tripped_reason
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/b")
+    assert len(calls) == 2
+
+
+def test_captcha_page_stops_as_blocked():
     page = httpx.Response(
         200,
         headers={"content-type": "text/html"},
         text="<html>자동입력 방지 문자를 입력하세요</html>",
     )
     client, _, _ = make_client(site({"/a": page}))
-    client.get("https://example.com/a")
-    assert client.guard.tripped
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/a")
+    assert client.guard.tripped_kind == TripKind.BLOCKED
     assert "challenge" in client.guard.tripped_reason
 
 
-def test_login_redirect_trips_guard():
+def test_login_redirect_stops_as_blocked():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/robots.txt":
             return httpx.Response(200, text="")
@@ -129,40 +162,28 @@ def test_login_redirect_trips_guard():
         return httpx.Response(200, text="login form")
 
     client, _, _ = make_client(handler)
-    client.get("https://example.com/a")
-    assert client.guard.tripped
-
-
-def test_deleted_posts_do_not_trip_but_repeated_client_errors_do():
-    pages = {"/gone": httpx.Response(404), "/bad": httpx.Response(400)}
-    client, _, _ = make_client(site(pages))
-    for _ in range(5):
-        client.get("https://example.com/gone")
-    assert not client.guard.tripped
-
-    for _ in range(2):
-        client.get("https://example.com/bad")
-    assert not client.guard.tripped
-    client.get("https://example.com/bad")
-    assert client.guard.tripped
-
-
-def test_server_errors_are_failures_not_blocks():
-    client, _, _ = make_client(site({"/a": httpx.Response(503)}))
-    for _ in range(5):
+    with pytest.raises(CollectionBlocked):
         client.get("https://example.com/a")
+    assert client.guard.tripped_kind == TripKind.BLOCKED
+
+
+def test_deleted_posts_are_not_treated_as_problems():
+    client, _, _ = make_client(site({"/gone": httpx.Response(404)}))
+    for _ in range(5):
+        assert client.get("https://example.com/gone").status_code == 404
     assert not client.guard.tripped
-    assert client.stats.failures == 5
-    assert client.stats.requests == 6  # robots + 5
 
 
-def test_guard_success_resets_client_error_streak():
-    guard = BlockGuard(max_consecutive_client_errors=2)
+def test_on_trip_is_called_once_with_kind_and_reason():
+    seen: list[tuple[TripKind, str]] = []
+    guard = BlockGuard(on_trip=lambda kind, reason: seen.append((kind, reason)))
     req = httpx.Request("GET", "https://example.com/x")
-    guard.observe(httpx.Response(400, request=req))
-    guard.observe(httpx.Response(200, request=req, text=""))
-    guard.observe(httpx.Response(400, request=req))
-    assert not guard.tripped
+    guard.observe(httpx.Response(503, request=req))
+    guard.observe(httpx.Response(403, request=req))
+    guard.trip(TripKind.ERROR, "parse failed")
+    assert len(seen) == 1
+    assert seen[0][0] == TripKind.ERROR
+    assert "503" in seen[0][1]
 
 
 def test_author_hash_is_stable_salted_and_not_reversible_by_shape():

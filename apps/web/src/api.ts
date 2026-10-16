@@ -1,7 +1,7 @@
 export type SourceStatus = {
   id: string
   display_name: string
-  access_status: 'not_authorized' | 'test_mode' | 'live' | 'paused' | 'blocked'
+  access_status: 'not_authorized' | 'test_mode' | 'live' | 'paused' | 'blocked' | 'stopped'
   live_enabled: boolean
 }
 

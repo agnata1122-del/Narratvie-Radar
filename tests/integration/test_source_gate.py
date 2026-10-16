@@ -2,7 +2,8 @@ import sqlalchemy as sa
 from typer.testing import CliRunner
 
 from narrative_radar.cli import app
-from narrative_radar.collectors.gate import can_collect, mark_blocked, set_status
+from narrative_radar.collectors.gate import auto_stop, can_collect, set_status
+from narrative_radar.collectors.guard import TripKind
 from narrative_radar.core.config import Settings
 from narrative_radar.db.models import SourceAdapter
 from narrative_radar.db.seed import seed_defaults
@@ -27,8 +28,14 @@ def test_collection_requires_global_switch_source_switch_live_status_and_salt(se
     ).allowed
     assert not can_collect(Settings(live_collection_enabled=True), adapter).allowed
 
-    mark_blocked(session, adapter.source_adapter_id, "HTTP 403", clock)
+    auto_stop(session, adapter.source_adapter_id, TripKind.BLOCKED, "HTTP 403", clock)
     assert adapter.access_status == SourceAccessStatus.BLOCKED
+    assert adapter.live_enabled is False
+    assert not can_collect(on, adapter).allowed
+
+    set_status(session, adapter.source_adapter_id, SourceAccessStatus.LIVE, "t", clock, True)
+    auto_stop(session, adapter.source_adapter_id, TripKind.ERROR, "HTTP 503", clock)
+    assert adapter.access_status == SourceAccessStatus.STOPPED
     assert adapter.live_enabled is False
     assert not can_collect(on, adapter).allowed
 
@@ -54,11 +61,11 @@ def test_cli_enable_requires_explicit_policy_acknowledgement(db_url, session, cl
         session.expire_all()
         assert _adapter(session).access_status == SourceAccessStatus.LIVE
 
-        # 차단되지 않은 소스는 reset할 수 없다
+        # 자동 중단되지 않은 소스는 reset할 수 없다
         result = runner.invoke(app, ["sources", "reset", "dcinside_stockus", "--reason", "x"])
         assert result.exit_code == 1
 
-        mark_blocked(session, "dcinside_stockus", "HTTP 403", clock)
+        auto_stop(session, "dcinside_stockus", TripKind.ERROR, "ConnectTimeout", clock)
         session.commit()
         result = runner.invoke(
             app, ["sources", "reset", "dcinside_stockus", "--reason", "rate too high"]

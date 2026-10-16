@@ -1,10 +1,17 @@
-"""차단 신호를 감지하면 수집을 멈춘다 (DATA_POLICY 5).
+"""수집 중 문제가 생기면 그 즉시 멈춘다 (DATA_POLICY 5).
 
-멈춘 뒤에는 이 프로세스 안에서 다시 요청하지 않는다. 해제는 사람이 원인을 확인한 뒤
-`nr sources reset`으로 한다. 우회(프록시 회전, IP 변경, 캡차 풀이)는 하지 않는다.
+- 차단 신호(401/403/429, 캡차·차단 안내 페이지, 로그인 리다이렉트) → BLOCKED
+- 그 밖의 문제(다른 4xx, 5xx, 타임아웃·연결 오류, robots.txt 확인 불가, 파싱 실패) → ERROR
+- 예외: 삭제된 글(404/410)은 흔하므로 문제로 보지 않는다.
+
+한 번 멈추면 이 프로세스 안에서는 다시 요청하지 않는다. 재개는 사람이 원인을 확인한 뒤
+`nr sources reset`으로 한다. 차단을 피하려는 우회(IP·VPN 서버 변경, 프록시 회전, 캡차 풀이)는
+하지 않는다.
 """
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
 
 import httpx
 
@@ -26,15 +33,21 @@ BLOCK_BODY_MARKERS = (
 LOGIN_PATH_MARKERS = ("/login", "/signin", "nid.naver.com", "sign.dcinside.com")
 
 
+class TripKind(StrEnum):
+    BLOCKED = "blocked"  # 사이트가 차단 신호를 보냄
+    ERROR = "error"  # 그 밖의 문제
+
+
 class CollectionBlocked(RuntimeError):
-    """차단 신호 때문에 수집이 멈춘 상태에서 요청하려 할 때."""
+    """수집이 멈춘 상태에서 요청하려 할 때."""
 
 
 @dataclass
 class BlockGuard:
-    max_consecutive_client_errors: int = 3
+    # 멈추는 순간 호출된다. 수집 실행기가 여기서 DB의 소스 상태를 바로 바꾼다.
+    on_trip: Callable[[TripKind, str], None] | None = None
+    tripped_kind: TripKind | None = None
     tripped_reason: str | None = None
-    _consecutive_client_errors: int = field(default=0, init=False)
 
     @property
     def tripped(self) -> bool:
@@ -42,40 +55,32 @@ class BlockGuard:
 
     def check(self) -> None:
         if self.tripped_reason is not None:
-            raise CollectionBlocked(self.tripped_reason)
+            raise CollectionBlocked(f"{self.tripped_kind}: {self.tripped_reason}")
 
-    def trip(self, reason: str) -> None:
-        if self.tripped_reason is None:
-            self.tripped_reason = reason
+    def trip(self, kind: TripKind, reason: str) -> None:
+        if self.tripped_reason is not None:
+            return
+        self.tripped_kind = kind
+        self.tripped_reason = reason
+        if self.on_trip is not None:
+            self.on_trip(kind, reason)
 
     def observe(self, response: httpx.Response) -> None:
-        """응답을 보고 차단 여부를 판단한다. 5xx는 서버 문제로 보고 차단으로 치지 않는다."""
         status = response.status_code
+        url = response.request.url
         if status in BLOCK_STATUS_CODES:
-            self.trip(f"HTTP {status} from {response.request.url}")
+            self.trip(TripKind.BLOCKED, f"HTTP {status} from {url}")
+        elif any(m in str(response.url).lower() for m in LOGIN_PATH_MARKERS):
+            self.trip(TripKind.BLOCKED, f"redirected to login page: {response.url}")
+        elif status < 400 and _looks_like_challenge(response):
+            self.trip(TripKind.BLOCKED, f"challenge page detected at {url}")
+        elif status in GONE_STATUS_CODES:
             return
+        elif status >= 400:
+            self.trip(TripKind.ERROR, f"HTTP {status} from {url}")
 
-        location = str(response.url).lower()
-        if any(m in location for m in LOGIN_PATH_MARKERS):
-            self.trip(f"redirected to login page: {response.url}")
-            return
-
-        if status < 400 and _looks_like_challenge(response):
-            self.trip(f"challenge page detected at {response.request.url}")
-            return
-
-        if status in GONE_STATUS_CODES:
-            return  # 삭제된 글은 흔하다. 차단 신호로도, 정상 응답으로도 세지 않는다
-
-        if 400 <= status < 500:
-            self._consecutive_client_errors += 1
-            if self._consecutive_client_errors >= self.max_consecutive_client_errors:
-                self.trip(
-                    f"{self._consecutive_client_errors} consecutive client errors "
-                    f"(last HTTP {status} from {response.request.url})"
-                )
-        elif status < 400:
-            self._consecutive_client_errors = 0
+    def observe_exception(self, url: str, exc: Exception) -> None:
+        self.trip(TripKind.ERROR, f"{type(exc).__name__} for {url}: {exc}")
 
 
 def _looks_like_challenge(response: httpx.Response) -> bool:

@@ -1,6 +1,6 @@
 """수집 어댑터가 내놓는 표준 문서 (PRD 5.2).
 
-작성자 원문 식별자는 받지 않는다. 어댑터는 HMAC 결과(64자리 hex)만 넘길 수 있다 (DATA_POLICY 7).
+작성자 원문 식별자는 받지 않는다. 어댑터는 HMAC 결과(64자리 hex)만 넘길 수 있다 (DATA_POLICY 8).
 """
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field

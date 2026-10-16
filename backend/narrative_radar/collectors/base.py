@@ -17,7 +17,12 @@ class ListingItem:
 
 
 class Collector(Protocol):
-    """소스별 어댑터가 구현한다. 모든 HTTP 요청은 PoliteClient를 거쳐야 한다."""
+    """소스별 어댑터가 구현한다.
+
+    - 모든 HTTP 요청은 PoliteClient를 거쳐야 한다.
+    - 페이지 구조가 예상과 다르면(파싱 실패) 추측해서 채우지 말고
+      `client.guard.trip(TripKind.ERROR, ...)`로 수집을 멈춘다.
+    """
 
     source_adapter_id: str
     parser_version: str

@@ -148,27 +148,28 @@ def sources_pause(source_id: str, reason: str = "paused by owner") -> None:
 
 @sources_app.command("reset")
 def sources_reset(
-    source_id: str, reason: str = typer.Option(..., help="차단 원인 확인 내용")
+    source_id: str, reason: str = typer.Option(..., help="중단 원인을 확인한 내용")
 ) -> None:
-    """차단(blocked) 상태를 해제해 paused로 돌린다. 다시 수집하려면 enable을 실행한다."""
-    from narrative_radar.collectors.gate import get_adapter, set_status
+    """자동 중단(blocked/stopped)을 해제해 paused로 돌린다. 다시 수집하려면 enable을 실행한다."""
+    from narrative_radar.collectors.gate import AUTO_STOP_STATUSES, get_adapter, set_status
     from narrative_radar.core.clock import SystemClock
     from narrative_radar.db.session import session_scope
     from narrative_radar.schemas.enums import SourceAccessStatus
 
     with session_scope(_sessions()) as session:
-        if get_adapter(session, source_id).access_status != SourceAccessStatus.BLOCKED:
-            typer.echo(f"{source_id} is not blocked")
+        adapter = get_adapter(session, source_id)
+        if adapter.access_status not in AUTO_STOP_STATUSES:
+            typer.echo(f"{source_id} was not auto-stopped (status: {adapter.access_status.value})")
             raise typer.Exit(code=1)
         set_status(
             session,
             source_id,
             SourceAccessStatus.PAUSED,
-            f"block reviewed: {reason}",
+            f"auto-stop reviewed: {reason}",
             SystemClock(),
             live_enabled=False,
         )
-    typer.echo(f"{source_id}: paused (block reviewed)")
+    typer.echo(f"{source_id}: paused (auto-stop reviewed)")
 
 
 if __name__ == "__main__":

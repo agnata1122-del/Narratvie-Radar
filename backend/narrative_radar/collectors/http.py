@@ -1,6 +1,8 @@
 """수집기가 쓰는 유일한 HTTP 클라이언트. DATA_POLICY의 규칙을 여기서 강제한다.
 
-- 모든 요청 전에 차단 상태를 확인하고 최소 간격을 기다린다.
+- 모든 요청 전에 중단 상태를 확인하고 최소 간격을 기다린다.
+- 문제가 생기면(guard.py) 그 응답을 넘기지 않고 CollectionBlocked를 던진다.
+  이후 요청도 모두 거부한다.
 - 정직한 User-Agent를 쓰고 브라우저로 위장하지 않는다.
 - robots.txt를 확인해 금지된 경로는 요청하지 않는다. Crawl-delay가 더 길면 그것을 따른다.
 - GET만 지원한다. 글쓰기·로그인 같은 요청은 만들 수 없다.
@@ -12,7 +14,7 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 
-from narrative_radar.collectors.guard import BlockGuard
+from narrative_radar.collectors.guard import BlockGuard, CollectionBlocked
 from narrative_radar.collectors.rate_limit import MinIntervalLimiter
 
 DEFAULT_MIN_INTERVAL_SECONDS = 3.0
@@ -20,10 +22,6 @@ DEFAULT_MIN_INTERVAL_SECONDS = 3.0
 
 class RobotsDisallowed(RuntimeError):
     """robots.txt가 금지한 경로."""
-
-
-class RobotsUnavailable(RuntimeError):
-    """robots.txt를 확인할 수 없어(5xx·네트워크 오류) 요청하지 않음."""
 
 
 @dataclass
@@ -81,14 +79,16 @@ class PoliteClient:
         self.stats.requests += 1
         try:
             response = self._client.get(url, params=params)
-        except httpx.HTTPError:
+        except httpx.HTTPError as e:
             self.stats.failures += 1
-            raise
+            self.guard.observe_exception(url, e)
+            raise CollectionBlocked(self.guard.tripped_reason) from e
         self.guard.observe(response)
-        if response.is_success and not self.guard.tripped:
-            self.stats.successes += 1
-        else:
+        if self.guard.tripped:
             self.stats.failures += 1
+            self.guard.check()  # 문제가 생긴 응답은 호출자에게 넘기지 않고 바로 멈춘다
+        if response.is_success:
+            self.stats.successes += 1
         return response
 
     def _robots_for(self, url: str) -> RobotFileParser:
@@ -99,15 +99,10 @@ class PoliteClient:
             return cached
 
         parser = RobotFileParser()
-        try:
-            response = self._send(f"{origin}/robots.txt")
-        except httpx.HTTPError as e:
-            raise RobotsUnavailable(f"{origin}/robots.txt: {e}") from e
-        self.guard.check()  # 401/403/429 등은 guard가 이미 차단으로 처리했다
-        if response.status_code >= 500:
-            raise RobotsUnavailable(f"{origin}/robots.txt: HTTP {response.status_code}")
-        if response.status_code >= 400:
-            parser.parse([])  # 없음(404 등) = 제한 없음 (RFC 9309)
+        # robots.txt를 확인할 수 없으면(오류·차단) _send가 수집을 멈춘다.
+        response = self._send(f"{origin}/robots.txt")
+        if response.status_code in (404, 410):
+            parser.parse([])  # 없음 = 제한 없음 (RFC 9309)
         else:
             parser.parse(response.text.splitlines())
         self._robots[origin] = parser

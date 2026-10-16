@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from narrative_radar.collectors.guard import TripKind
 from narrative_radar.core.clock import Clock
 from narrative_radar.core.config import Settings
 from narrative_radar.db.models import SourceAdapter
@@ -59,8 +60,13 @@ def set_status(
     return adapter
 
 
-def mark_blocked(session: Session, source_adapter_id: str, reason: str, clock: Clock) -> None:
-    """차단 신호 감지 시. live_enabled도 끈다: 사람이 확인하기 전에는 다시 켜지지 않는다."""
-    set_status(
-        session, source_adapter_id, SourceAccessStatus.BLOCKED, reason, clock, live_enabled=False
-    )
+AUTO_STOP_STATUSES = frozenset({SourceAccessStatus.BLOCKED, SourceAccessStatus.STOPPED})
+
+
+def auto_stop(
+    session: Session, source_adapter_id: str, kind: TripKind, reason: str, clock: Clock
+) -> None:
+    """수집 중 문제가 생겼을 때 즉시 호출한다. live_enabled도 끈다:
+    사람이 원인을 확인하고 `nr sources reset` → `enable` 하기 전에는 다시 수집하지 않는다."""
+    status = SourceAccessStatus.BLOCKED if kind == TripKind.BLOCKED else SourceAccessStatus.STOPPED
+    set_status(session, source_adapter_id, status, reason, clock, live_enabled=False)
