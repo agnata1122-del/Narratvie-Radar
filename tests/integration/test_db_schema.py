@@ -37,6 +37,8 @@ from narrative_radar.schemas.enums import (
     SourceKind,
 )
 
+ALL_SOURCE_IDS = {"bluesky_jetstream", "hackernews", "dcinside_stockus", "naver_world_nvda"}
+
 KST = timezone(timedelta(hours=9))
 
 
@@ -212,7 +214,7 @@ def test_seed_is_idempotent_and_starts_with_collection_off(session, clock):
     session.commit()
 
     sources = session.scalars(sa.select(SourceAdapter)).all()
-    assert {s.source_adapter_id for s in sources} == {"dcinside_stockus", "naver_world_nvda"}
+    assert {s.source_adapter_id for s in sources} == ALL_SOURCE_IDS
     assert all(s.access_status == SourceAccessStatus.NOT_AUTHORIZED for s in sources)
     assert all(not s.live_enabled for s in sources)
 

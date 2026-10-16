@@ -152,7 +152,7 @@ def _seed_sources(session: Session, now: datetime) -> None:
                 base_url=s.base_url,
                 access_status=SourceAccessStatus.NOT_AUTHORIZED,
                 live_enabled=False,
-                status_reason="docs/DATA_POLICY.md 확인 전까지 수집하지 않음",
+                status_reason="nr sources enable로 켜기 전까지 수집하지 않음 (docs/DATA_POLICY.md)",
                 config={},
                 updated_at=now,
             )

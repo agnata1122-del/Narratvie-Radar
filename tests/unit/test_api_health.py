@@ -9,6 +9,8 @@ from narrative_radar.db.models import SourceAdapter
 from narrative_radar.db.seed import seed_defaults
 from narrative_radar.schemas.enums import SourceAccessStatus
 
+ALL_SOURCE_IDS = {"bluesky_jetstream", "hackernews", "dcinside_stockus", "naver_world_nvda"}
+
 
 def _client(db_path: Path, **kw: object) -> TestClient:
     return TestClient(create_app(Settings(db_path=db_path, **kw)))
@@ -17,7 +19,7 @@ def _client(db_path: Path, **kw: object) -> TestClient:
 def test_health_without_database_still_reports_no_collection(tmp_path: Path):
     body = _client(tmp_path / "missing.db").get("/api/health").json()
     assert body["database"] == "uninitialized"
-    assert {s["id"] for s in body["sources"]} == {"dcinside_stockus", "naver_world_nvda"}
+    assert {s["id"] for s in body["sources"]} == ALL_SOURCE_IDS
     assert all(s["access_status"] == "not_authorized" for s in body["sources"])
     assert all(s["live_enabled"] is False for s in body["sources"])
 

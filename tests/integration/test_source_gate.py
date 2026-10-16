@@ -75,6 +75,6 @@ def test_cli_enable_requires_explicit_policy_acknowledgement(db_url, session, cl
         adapter = _adapter(session)
         assert adapter.access_status == SourceAccessStatus.PAUSED
         assert adapter.live_enabled is False
-        assert session.scalar(sa.select(sa.func.count()).select_from(SourceAdapter)) == 2
+        assert session.scalar(sa.select(sa.func.count()).select_from(SourceAdapter)) == 4
     finally:
         get_settings.cache_clear()

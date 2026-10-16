@@ -18,6 +18,22 @@ class SourceDefinition:
 
 
 DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
+    # 공식 API가 있는 소스 (DECISIONS D15)
+    SourceDefinition(
+        id="bluesky_jetstream",
+        source="bluesky",
+        kind=SourceKind.COMMUNITY,
+        display_name="Bluesky",
+        base_url="wss://jetstream2.us-east.bsky.network",
+    ),
+    SourceDefinition(
+        id="hackernews",
+        source="hackernews",
+        kind=SourceKind.COMMUNITY,
+        display_name="Hacker News",
+        base_url="https://hn.algolia.com",
+    ),
+    # 공식 경로가 없는 소스. 데이터 이용 문의 중 (DATA_POLICY 1–2)
     SourceDefinition(
         id="dcinside_stockus",
         source="dcinside",
