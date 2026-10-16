@@ -100,6 +100,7 @@ class EdgeStatus(StrEnum):
 
 class EventType(StrEnum):
     NODE_CREATED = "NODE_CREATED"
+    NODE_ACTIVATED = "NODE_ACTIVATED"  # 후보 노드가 관측 확정 관계를 처음 얻음
     NODE_DORMANT = "NODE_DORMANT"
     NODE_REACTIVATED = "NODE_REACTIVATED"
     NODE_MERGED = "NODE_MERGED"

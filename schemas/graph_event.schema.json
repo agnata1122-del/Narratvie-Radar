@@ -30,6 +30,7 @@
     "EventType": {
       "enum": [
         "NODE_CREATED",
+        "NODE_ACTIVATED",
         "NODE_DORMANT",
         "NODE_REACTIVATED",
         "NODE_MERGED",
