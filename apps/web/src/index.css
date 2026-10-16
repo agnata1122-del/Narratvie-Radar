@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+/* 미니멀한 데이터 터미널 톤 (PRD 12.4). 색은 토큰으로만 사용한다. */
+:root {
+  --nr-bg: #f7f8fa;
+  --nr-surface: #ffffff;
+  --nr-border: #e3e6eb;
+  --nr-text: #1b1f24;
+  --nr-muted: #5f6b7a;
+  --nr-accent: #2563eb;
+  --nr-warn-bg: #fff4d6;
+  --nr-warn-text: #7a5200;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --nr-bg: #0f1216;
+    --nr-surface: #161a20;
+    --nr-border: #262c35;
+    --nr-text: #e6e9ee;
+    --nr-muted: #8b96a5;
+    --nr-accent: #60a5fa;
+    --nr-warn-bg: #3a2c05;
+    --nr-warn-text: #f5cf6b;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --nr-bg: #0f1216;
+  --nr-surface: #161a20;
+  --nr-border: #262c35;
+  --nr-text: #e6e9ee;
+  --nr-muted: #8b96a5;
+  --nr-accent: #60a5fa;
+  --nr-warn-bg: #3a2c05;
+  --nr-warn-text: #f5cf6b;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-nr-bg: var(--nr-bg);
+  --color-nr-surface: var(--nr-surface);
+  --color-nr-border: var(--nr-border);
+  --color-nr-text: var(--nr-text);
+  --color-nr-muted: var(--nr-muted);
+  --color-nr-accent: var(--nr-accent);
+  --color-nr-warn-bg: var(--nr-warn-bg);
+  --color-nr-warn-text: var(--nr-warn-text);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nr-bg);
+  color: var(--nr-text);
+  font-family:
+    'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

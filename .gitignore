@@ -1,0 +1,32 @@
+# 실제 수집 데이터, DB, 골드셋은 절대 커밋하지 않는다 (docs/DATA_POLICY.md)
+data/*
+!data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+apps/web/dist/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
