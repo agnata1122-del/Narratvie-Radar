@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from narrative_radar import __version__
+from narrative_radar.api.routes import build_router
+from narrative_radar.core.clock import Clock, SystemClock
 from narrative_radar.core.config import Settings, get_settings
 from narrative_radar.core.sources import DEFAULT_SOURCES
 from narrative_radar.db.models import SourceAdapter
@@ -26,11 +28,12 @@ class HealthOut(BaseModel):
     sources: list[SourceStatusOut]
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, clock: Clock | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
     sessions = make_session_factory(engine)
     app = FastAPI(title="Narrative Radar API", version=__version__)
+    app.include_router(build_router(sessions, clock or SystemClock()))
 
     @app.get("/api/health", response_model=HealthOut)
     def health() -> HealthOut:
