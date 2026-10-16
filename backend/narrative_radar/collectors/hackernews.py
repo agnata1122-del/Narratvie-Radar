@@ -2,7 +2,7 @@
 
 - 새 글: Algolia HN 검색 API `search_by_date`로 관심 키워드가 들어간 글·댓글을 가져온다.
 - 재방문: 공식 Firebase API로 점수·댓글 수와 삭제(`deleted`)·숨김(`dead`) 여부를 확인한다.
-- 이 수집기가 시작되기 전에 올라온 글은 backfill로 표시한다 (DECISIONS D2).
+- 게시보다 기준 시간(기본 10분) 넘게 늦게 본 글은 backfill로 표시한다 (DECISIONS D2, D16).
 """
 
 from collections.abc import Sequence
@@ -41,7 +41,7 @@ class HackerNewsCollector:
         hasher: AuthorHasher,
         clock: Clock,
         terms: Sequence[str],
-        live_since: datetime,
+        late_threshold: timedelta = timedelta(minutes=10),
         first_lookback: timedelta = timedelta(hours=1),
         hits_per_page: int = 100,
     ) -> None:
@@ -51,7 +51,7 @@ class HackerNewsCollector:
         self.hasher = hasher
         self.clock = clock
         self.terms = minimal_terms(terms)
-        self.live_since = live_since
+        self.late_threshold = late_threshold
         self.first_lookback = first_lookback
         self.hits_per_page = hits_per_page
 
@@ -137,7 +137,9 @@ class HackerNewsCollector:
             observed_at=observed_at,
             content_access_status=ContentAccessStatus.PERMITTED,
             ingest_mode=(
-                IngestMode.BACKFILL if published_at < self.live_since else IngestMode.LIVE
+                IngestMode.BACKFILL
+                if observed_at - published_at > self.late_threshold
+                else IngestMode.LIVE
             ),
             metrics=None
             if is_comment

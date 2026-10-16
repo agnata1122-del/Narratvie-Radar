@@ -65,6 +65,10 @@ class RunContext:
     clock: Clock
     source_adapter_id: str
 
+    @property
+    def revisit_offsets(self) -> tuple[timedelta, ...]:
+        return tuple(timedelta(minutes=m) for m in sorted(self.settings.revisit_offsets_minutes))
+
     def require_allowed(self) -> AuthorHasher:
         with self.sessions() as session:
             decision = can_collect(self.settings, get_adapter(session, self.source_adapter_id))
@@ -127,10 +131,14 @@ def profile_terms(session: Session) -> list[str]:
 
 
 def due_revisits(
-    session: Session, source_adapter_id: str, now: datetime, limit: int = 50
+    session: Session,
+    source_adapter_id: str,
+    now: datetime,
+    limit: int = 50,
+    offsets: tuple[timedelta, ...] = REVISIT_OFFSETS,
 ) -> list[str]:
-    """지표를 다시 읽을 때가 된 글 (관측 후 10분·1시간·6시간·24시간)."""
-    horizon = now - REVISIT_OFFSETS[-1] - timedelta(hours=1)
+    """지표를 다시 읽을 때가 된 글 (기본: 관측 후 10분·1시간·6시간·24시간)."""
+    horizon = now - offsets[-1] - timedelta(hours=1)
     last_snapshot = (
         sa.select(
             DocumentMetricSnapshot.document_id,
@@ -152,7 +160,7 @@ def due_revisits(
 
     due: list[str] = []
     for external_id, observed_at, last_at in rows:
-        for offset in REVISIT_OFFSETS:
+        for offset in offsets:
             target = observed_at + offset
             if target <= now and (last_at is None or last_at < target):
                 due.append(external_id)
@@ -201,7 +209,9 @@ def hackernews_cycle(ctx: RunContext, collector: HackerNewsCollector, run_id: st
             _set_cursor(session, ctx, "since", result.newest_published_at.isoformat())
 
     with ctx.sessions() as session:
-        due = due_revisits(session, ctx.source_adapter_id, ctx.clock.now())
+        due = due_revisits(
+            session, ctx.source_adapter_id, ctx.clock.now(), offsets=ctx.revisit_offsets
+        )
     revisits = [collector.revisit(external_id) for external_id in due]
 
     deleted = 0
@@ -322,7 +332,9 @@ def consume_bluesky(
 
 def revisit_bluesky(ctx: RunContext, metrics: BlueskyMetrics, run_id: str) -> CycleReport:
     with ctx.sessions() as session:
-        due = due_revisits(session, ctx.source_adapter_id, ctx.clock.now(), limit=100)
+        due = due_revisits(
+            session, ctx.source_adapter_id, ctx.clock.now(), limit=100, offsets=ctx.revisit_offsets
+        )
     revisits = metrics.revisit_many(due)
     with ctx.sessions.begin() as session:
         deleted = _apply_revisits(

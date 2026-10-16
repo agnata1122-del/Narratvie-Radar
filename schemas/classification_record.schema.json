@@ -1,0 +1,296 @@
+{
+  "$defs": {
+    "ClaimExtract": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_status": {
+          "$ref": "#/$defs/EvidenceStatus"
+        },
+        "excerpt": {
+          "description": "주장이 드러난 원문 그대로",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "narrative_key": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "온톨로지의 내러티브 키. 해당 없으면 null",
+          "title": "Narrative Key"
+        },
+        "narrative_proposition": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "기존 내러티브에 맞지 않을 때 새 내러티브의 핵심 명제 한 문장",
+          "title": "Narrative Proposition"
+        },
+        "narrative_role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NarrativeRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "이 주장이 내러티브를 지지하는지 반박하는지"
+        },
+        "object": {
+          "description": "entities의 name 중 하나",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Object",
+          "type": "string"
+        },
+        "polarity": {
+          "$ref": "#/$defs/Polarity"
+        },
+        "predicate": {
+          "$ref": "#/$defs/EdgeType"
+        },
+        "stance": {
+          "$ref": "#/$defs/Stance"
+        },
+        "subject": {
+          "description": "entities의 name 중 하나",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject",
+        "predicate",
+        "object",
+        "polarity",
+        "stance",
+        "evidence_status",
+        "excerpt"
+      ],
+      "title": "ClaimExtract",
+      "type": "object"
+    },
+    "ClassificationOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ClaimExtract"
+          },
+          "maxItems": 8,
+          "title": "Claims",
+          "type": "array"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/EntityMention"
+          },
+          "maxItems": 20,
+          "title": "Entities",
+          "type": "array"
+        },
+        "is_noise": {
+          "description": "잡담·광고·밈처럼 분석할 내용이 없으면 true",
+          "title": "Is Noise",
+          "type": "boolean"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "maxLength": 8,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 639-1",
+          "title": "Language"
+        },
+        "needs_review": {
+          "description": "판단이 불확실하면 true. 억지로 분류하지 않는다",
+          "title": "Needs Review",
+          "type": "boolean"
+        },
+        "relevance": {
+          "description": "관심사와의 관련성. 모델 출력 지표이며 보정된 확률이 아니다",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Relevance",
+          "type": "number"
+        },
+        "review_reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Reason"
+        },
+        "stance": {
+          "$ref": "#/$defs/Stance"
+        }
+      },
+      "required": [
+        "relevance",
+        "is_noise",
+        "entities",
+        "stance",
+        "claims",
+        "needs_review"
+      ],
+      "title": "ClassificationOutput",
+      "type": "object"
+    },
+    "EdgeType": {
+      "enum": [
+        "RELATED_TO",
+        "PART_OF",
+        "BELONGS_TO",
+        "SUPPLIES_TO",
+        "COMPETES_WITH",
+        "AFFECTS",
+        "CLAIMED_CAUSE_OF",
+        "SUPPORTS",
+        "CONTRADICTS",
+        "CO_MENTIONED_WITH"
+      ],
+      "title": "EdgeType",
+      "type": "string"
+    },
+    "EntityMention": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_key": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "온톨로지에 있는 키를 고른다. 없으면 규칙에 맞는 새 키를 제안한다",
+          "title": "Canonical Key"
+        },
+        "name": {
+          "description": "원문에 나온 표기",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/NodeType"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "EntityMention",
+      "type": "object"
+    },
+    "EvidenceStatus": {
+      "description": "주장이 어떤 성격으로 제시됐는가 (원문 기준).",
+      "enum": [
+        "community_opinion",
+        "speculation",
+        "reported_fact",
+        "official_source"
+      ],
+      "title": "EvidenceStatus",
+      "type": "string"
+    },
+    "NarrativeRole": {
+      "enum": [
+        "supports",
+        "contradicts",
+        "detached"
+      ],
+      "title": "NarrativeRole",
+      "type": "string"
+    },
+    "NodeType": {
+      "enum": [
+        "company",
+        "industry",
+        "technology",
+        "topic",
+        "event",
+        "narrative"
+      ],
+      "title": "NodeType",
+      "type": "string"
+    },
+    "Polarity": {
+      "enum": [
+        "growth_driver",
+        "constraint",
+        "neutral"
+      ],
+      "title": "Polarity",
+      "type": "string"
+    },
+    "Stance": {
+      "enum": [
+        "bullish",
+        "bearish",
+        "neutral",
+        "mixed"
+      ],
+      "title": "Stance",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "세션이 돌려주는 한 줄: 어느 문서의 어느 내용 버전을 분류했는지 + 출력.",
+  "properties": {
+    "content_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "document_id": {
+      "title": "Document Id",
+      "type": "string"
+    },
+    "output": {
+      "$ref": "#/$defs/ClassificationOutput"
+    }
+  },
+  "required": [
+    "document_id",
+    "content_hash",
+    "output"
+  ],
+  "title": "ClassificationRecord",
+  "type": "object"
+}

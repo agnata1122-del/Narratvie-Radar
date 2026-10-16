@@ -78,9 +78,7 @@ def hn_collector(ctx, handler, clock):
         guard=ctx.guard(),
         transport=httpx.MockTransport(handler),
     )
-    return HackerNewsCollector(
-        client, AuthorHasher(SALT), clock, ["NVIDIA"], live_since=clock.now() - timedelta(hours=1)
-    )
+    return HackerNewsCollector(client, AuthorHasher(SALT), clock, ["NVIDIA"])
 
 
 STORY = {
@@ -283,3 +281,22 @@ def test_cli_collect_refuses_without_permission(db_url, session_factory, clock, 
         assert "수집할 수 없습니다" in result.output
     finally:
         get_settings.cache_clear()
+
+
+def test_revisit_offsets_follow_settings(session_factory, clock):
+    with session_factory.begin() as s:
+        seed_defaults(s, clock)
+        set_status(s, "hackernews", SourceAccessStatus.LIVE, "t", clock, live_enabled=True)
+    settings = Settings(
+        live_collection_enabled=True, author_hash_salt=SALT, revisit_offsets_minutes=(180, 60)
+    )
+    c = RunContext(settings, session_factory, clock, "hackernews")
+    assert c.revisit_offsets == (timedelta(hours=1), timedelta(hours=3))
+    collector = hn_collector(c, hn_api([STORY]), clock)
+    with c.run(RunKind.COLLECT, {}) as run_id:
+        hackernews_cycle(c, collector, run_id)
+    with session_factory() as s:
+        later = clock.now() + timedelta(minutes=30)
+        assert due_revisits(s, "hackernews", later, offsets=c.revisit_offsets) == []
+        later = clock.now() + timedelta(minutes=61)
+        assert due_revisits(s, "hackernews", later, offsets=c.revisit_offsets) == ["1"]

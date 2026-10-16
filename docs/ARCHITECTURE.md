@@ -12,7 +12,7 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
   │  Document 스키마, content_hash, derivation group
   ▼
 프리필터 → 분류 (classifiers/)
-  │  Haiku 구조화 출력 → classification_runs (추가만)
+  │  세션 분류(지침 v1, JSON) → 스키마 검증 → classification_runs (추가만)
   ▼
 변경안(ChangeSet) 검증 (graph/, normalization/, discovery/)
   │  개체 정규화, depth, 확장 예산, 근거 요건
@@ -43,6 +43,7 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
 | `backend/narrative_radar/db/` | SQLAlchemy 모델, 세션, 마이그레이션 |
 | `backend/narrative_radar/collectors/` | 소스별 어댑터. `http.py`(유일한 HTTP 클라이언트: 최소 간격, robots.txt, 정직한 UA, GET만), `guard.py`(첫 문제에서 즉시 중단), `author.py`(작성자 HMAC), `gate.py`(수집 허용 조건과 상태 변경), `hackernews.py`, `bluesky.py` |
 | `backend/narrative_radar/ingest/` | 수집 결과 저장(`store.py`: 중복 방지, 스냅샷, 삭제 반영), 수집 실행기(`runner.py`), 수집 상태 기록, 현황 요약 |
+| `backend/narrative_radar/classifiers/` | 세션 분류 내보내기·검증(`session.py`), 분류 지침(`guidelines/`), 온톨로지 문맥, 규칙 기반 기준 분류기 |
 | `backend/narrative_radar/api/` | FastAPI 앱 |
 | `backend/narrative_radar/cli.py` | `nr` 명령줄 도구 |
 | `apps/web/` | React 웹앱 |

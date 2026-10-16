@@ -323,3 +323,11 @@ def test_metrics_revisit_reads_counts_and_treats_missing_as_deleted():
     assert revisits[gone].deleted
     m = revisits[kept].metrics
     assert (m.upvote_count, m.comment_count, m.share_count) == (7, 2, 4)
+
+
+def test_late_threshold_is_configurable_for_batch_runs():
+    h = JetstreamHandler(
+        AuthorHasher("s" * 32), FixedClock(NOW), ["nvidia"], late_threshold=timedelta(hours=4)
+    )
+    [action] = h.handle(post_event("nvidia", at=NOW - timedelta(hours=3)))
+    assert action.document.ingest_mode == IngestMode.LIVE

@@ -19,6 +19,7 @@
 | [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | 테이블, 시간 필드, 추가만 허용하는 이력 테이블 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 마일스톤과 체크포인트 |
 | [docs/SOURCE_FEASIBILITY.md](docs/SOURCE_FEASIBILITY.md) | 수집 가능성 확인 절차와 결과 |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | 클라우드 세션만으로 운영하는 주기 절차 |
 
 ## 데이터에 대해
 
@@ -50,12 +51,15 @@ uv run nr collect hackernews --loop         # HN 수집
 uv run nr collect bluesky                   # Bluesky 스트림 수집
 uv run nr collect bluesky-metrics --loop    # Bluesky 지표 재방문
 uv run nr sources report                    # 수집 현황 요약
+uv run nr classify pending                  # 분류할 글 내보내기 (세션이 분류)
+uv run nr classify ingest <out.jsonl> --model <이름>   # 분류 결과 검증·저장
+uv run nr classify baseline                 # 규칙 기반 기준 분류
 ```
 
 ## 구조
 
 ```text
-backend/narrative_radar/   Python 백엔드 (FastAPI, SQLAlchemy, Anthropic SDK)
+backend/narrative_radar/   Python 백엔드 (FastAPI, SQLAlchemy)
 apps/web/                  React 웹앱 (Vite, TypeScript, Tailwind)
 schemas/                   내보낸 JSON Schema
 tests/                     단위·통합 테스트

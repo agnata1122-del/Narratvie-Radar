@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from narrative_radar.schemas.classification import ClassificationOutput
+from narrative_radar.schemas.classification import ClassificationOutput, ClassificationRecord
 from narrative_radar.schemas.document import DocumentIn
 from narrative_radar.schemas.events import GraphEventOut
 from narrative_radar.schemas.profile import InterestProfileConfig
@@ -13,6 +13,7 @@ from narrative_radar.schemas.views import SavedViewIn
 
 EXPORTS: dict[str, type[BaseModel]] = {
     "classification_output": ClassificationOutput,
+    "classification_record": ClassificationRecord,
     "document": DocumentIn,
     "graph_event": GraphEventOut,
     "interest_profile": InterestProfileConfig,

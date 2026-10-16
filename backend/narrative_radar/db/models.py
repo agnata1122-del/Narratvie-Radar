@@ -255,6 +255,8 @@ class ClassificationRun(Base):
 
     classification_id: Mapped[str] = mapped_column(ID, primary_key=True)
     document_id: Mapped[str] = mapped_column(fk("documents.document_id"), index=True)
+    # 어느 내용 버전을 분류했는지. 글이 수정되면 다시 분류 대상이 된다.
+    content_hash: Mapped[str] = mapped_column(sa.String(64))
     run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
     model: Mapped[str] = mapped_column(sa.String(100))
     prompt_version: Mapped[str] = mapped_column(sa.String(64))

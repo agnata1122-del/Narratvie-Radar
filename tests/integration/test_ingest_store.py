@@ -113,6 +113,7 @@ def test_deletion_removes_text_but_keeps_the_fact(session, clock):
     cls = ClassificationRun(
         classification_id="cls_test",
         document_id=doc_id,
+        content_hash=session.get(Document, doc_id).content_hash,
         run_id=session.get(Document, doc_id).collect_run_id,
         model="m",
         prompt_version="p",

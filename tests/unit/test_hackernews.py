@@ -18,7 +18,6 @@ from narrative_radar.core.clock import FixedClock
 from narrative_radar.schemas.enums import IngestMode
 
 NOW = datetime(2026, 10, 16, 3, 0, tzinfo=UTC)
-LIVE_SINCE = NOW - timedelta(minutes=30)
 
 
 def _ts(dt: datetime) -> int:
@@ -73,9 +72,7 @@ def make(handler, clock=None):
         limiter=MinIntervalLimiter(0),
         transport=httpx.MockTransport(recording),
     )
-    collector = HackerNewsCollector(
-        client, AuthorHasher("s" * 32), clock, terms=["nvidia", "NVDA"], live_since=LIVE_SINCE
-    )
+    collector = HackerNewsCollector(client, AuthorHasher("s" * 32), clock, terms=["nvidia", "NVDA"])
     return collector, requests
 
 
@@ -111,7 +108,7 @@ def test_poll_maps_stories_and_comments_and_dedupes_across_terms():
         "Example comment about NVDA supply.\nSecond line link (https://example.org)"
     )
     assert comment.metrics is None
-    # 수집기가 시작되기 전에 올라온 글은 backfill
+    # 게시 후 10분 넘게 지나서 본 글은 backfill
     assert comment.ingest_mode == IngestMode.BACKFILL
 
     assert story.author_hash is not None and len(story.author_hash) == 64

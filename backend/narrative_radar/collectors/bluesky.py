@@ -86,6 +86,7 @@ class JetstreamHandler:
     hasher: AuthorHasher
     clock: Clock
     terms: Sequence[str]
+    late_threshold: timedelta = LATE_THRESHOLD
     stats: HandlerStats = field(default_factory=HandlerStats)
     last_time_us: int | None = None
 
@@ -156,7 +157,7 @@ class JetstreamHandler:
                     content_access_status=ContentAccessStatus.PERMITTED,
                     ingest_mode=(
                         IngestMode.BACKFILL
-                        if observed_at - published_at > LATE_THRESHOLD
+                        if observed_at - published_at > self.late_threshold
                         else IngestMode.LIVE
                     ),
                 )

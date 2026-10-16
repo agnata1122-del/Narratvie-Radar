@@ -67,7 +67,7 @@ def collect_hackernews(
         hasher,
         ctx.clock,
         terms,
-        live_since=ctx.clock.now(),
+        late_threshold=timedelta(minutes=ctx.settings.backfill_after_minutes),
         first_lookback=timedelta(minutes=lookback_minutes),
     )
     typer.echo(f"terms: {terms}")
@@ -90,11 +90,20 @@ def collect_hackernews(
         client.close()
 
 
+# 스트림이 현재 시각에서 이만큼 안쪽까지 오면 따라잡은 것으로 본다.
+CAUGHT_UP_SECONDS = 30
+
+
 @collect_app.command("bluesky")
 def collect_bluesky(
     max_minutes: float | None = typer.Option(None, help="이 시간(분)만큼 받고 끝낸다"),
+    until_caught_up: bool = typer.Option(
+        False, help="밀린 이벤트를 현재 시각 근처까지 따라잡으면 끝낸다 (주기 실행용)"
+    ),
 ) -> None:
-    """Bluesky Jetstream에서 관심 키워드가 들어간 글을 실시간으로 모은다."""
+    """Bluesky Jetstream에서 관심 키워드가 들어간 글을 모은다."""
+    from datetime import timedelta
+
     from narrative_radar.collectors.bluesky import JetstreamHandler, JetstreamStream
     from narrative_radar.collectors.gate import get_adapter
     from narrative_radar.collectors.guard import CollectionBlocked
@@ -107,11 +116,21 @@ def collect_bluesky(
         terms = profile_terms(session)
         base_url = get_adapter(session, ctx.source_adapter_id).base_url
     stream = JetstreamStream(ctx.settings.user_agent, ctx.guard(), base_url=f"{base_url}/subscribe")
-    handler = JetstreamHandler(hasher, ctx.clock, terms)
+    handler = JetstreamHandler(
+        hasher,
+        ctx.clock,
+        terms,
+        late_threshold=timedelta(minutes=ctx.settings.backfill_after_minutes),
+    )
     started = time.monotonic()
 
     def should_stop() -> bool:
-        return max_minutes is not None and time.monotonic() - started >= max_minutes * 60
+        if max_minutes is not None and time.monotonic() - started >= max_minutes * 60:
+            return True
+        if until_caught_up and handler.last_time_us is not None:
+            behind = ctx.clock.now().timestamp() - handler.last_time_us / 1_000_000
+            return behind <= CAUGHT_UP_SECONDS
+        return False
 
     typer.echo(f"terms: {terms}")
     try:
