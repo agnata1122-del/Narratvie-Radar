@@ -54,6 +54,23 @@ uv run nr sources report                    # 수집 현황 요약
 uv run nr classify pending                  # 분류할 글 내보내기 (세션이 분류)
 uv run nr classify ingest <out.jsonl> --model <이름>   # 분류 결과 검증·저장
 uv run nr classify baseline                 # 규칙 기반 기준 분류
+uv run nr graph build                       # 분류 결과를 그래프에 반영
+uv run nr wiki refresh                      # 위키 갱신
+```
+
+### 화면
+
+`make dev-api`와 `make dev-web`을 띄우고 http://127.0.0.1:5173 을 엽니다.
+
+- 왼쪽: 지난 방문 이후(또는 최근 24시간·7일) 새로 관측된 것과 달라진 기존 이야기. 항목을 누르면 그래프에서 강조되고 오른쪽에 위키나 근거가 열립니다.
+- 가운데: 관심사 그래프. 크기는 관심도, 색은 유형, 진한 선은 관측 확정, 연한 선은 발견 후보입니다.
+- 아래: 타임라인. 슬라이더나 재생 버튼으로 시점을 옮기면 그래프·위키·달라진 점이 모두 그 시점 기준으로 바뀝니다. 빗금은 관측 공백입니다.
+
+수집한 데이터가 아직 없을 때 화면 모양만 확인하려면 형식 확인용 픽스처 DB를 씁니다. 실제 글이 아니며 데모·평가용이 아닙니다.
+
+```bash
+uv run python tests/e2e/make_ui_fixture_db.py /tmp/ui-fixture.db
+NR_DB_PATH=/tmp/ui-fixture.db uv run nr serve
 ```
 
 ## 구조

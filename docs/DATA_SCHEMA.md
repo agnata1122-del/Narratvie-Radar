@@ -58,7 +58,7 @@
 | 테이블 | 역할 |
 |---|---|
 | `profile_nodes` | 관심사별 자동 확장 결정 이력 (포함 / 검토 대기 / 제외, depth) |
-| `viewers` | 익명 방문자 |
+| `viewers` | 익명 방문자. `previous_seen_at`은 "지난 방문 이후"의 기준 시각 (30분 안에 다시 열면 바뀌지 않음) |
 | `viewer_overlays` | 방문자별 승인·거절·숨김. 공통 그래프는 바꾸지 않는다 |
 | `saved_views` | 저장된 필터 |
 | `classification_feedback` | 테스터 피드백과 그때의 모델·프롬프트·스키마 버전 |

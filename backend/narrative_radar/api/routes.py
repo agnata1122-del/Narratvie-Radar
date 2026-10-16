@@ -37,6 +37,7 @@ from narrative_radar.temporal.narratives import narrative_state_at
 from narrative_radar.temporal.state import GraphState, graph_state
 from narrative_radar.wiki.build import latest_revision
 
+VISIT_GAP = timedelta(minutes=30)
 VIEWER_COOKIE = "nr_viewer"
 MAX_FRAMES = 96
 
@@ -104,15 +105,20 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
 
     @router.post("/viewer/visit")
     def visit(response: Response, session: DB, viewer: ViewerId = None) -> dict[str, object]:
-        """방문 기록. 이전 방문 시각을 돌려주고 지금으로 갱신한다 ("지난 방문 이후")."""
+        """방문 기록. "지난 방문 이후"의 기준 시각을 돌려준다.
+
+        VISIT_GAP 안에 다시 열면(새로고침 등) 같은 방문으로 보고 기준 시각을 그대로 둔다.
+        """
         now = clock.now()
         v = session.get(Viewer, viewer) if viewer else None
-        previous = v.last_seen_at if v else None
         if v is None:
             v = Viewer(viewer_id=new_id("vwr", now), created_at=now, last_seen_at=now)
             session.add(v)
         else:
+            if now - v.last_seen_at >= VISIT_GAP:
+                v.previous_seen_at = v.last_seen_at
             v.last_seen_at = now
+        previous = v.previous_seen_at
         session.commit()
         response.set_cookie(
             VIEWER_COOKIE, v.viewer_id, max_age=60 * 60 * 24 * 365, httponly=True, samesite="lax"

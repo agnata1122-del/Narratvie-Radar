@@ -270,3 +270,28 @@ def test_wiki_revisions_are_versioned_and_time_travel(g, clock):
     assert g.session.scalar(sa.select(sa.func.count()).select_from(WikiRevision)) >= 4
     overview = next(s for s in latest.sections if s["key"] == "overview")["markdown"]
     assert "사실 확인을 거치지 않았다" in overview
+
+
+def test_narrative_node_is_active_and_its_links_stay_confirmed_in_state(g, clock):
+    # 내러티브를 지지한 글은 내러티브 노드의 언급으로 센다. 같은 반영에서 생기고 확정된 연결은
+    # 시점별 상태에서도 확정으로 남아야 한다 (이벤트 순서 = ID 순서).
+    for author, w in (("a", "alpha words"), ("b", "beta other words entirely")):
+        g.post(
+            f"{w} HBM NVIDIA {FILLER}",
+            [NV, HBM],
+            [
+                affects(
+                    "HBM",
+                    "NVIDIA",
+                    narrative_proposition="HBM supply limits NVIDIA",
+                    narrative_role="supports",
+                )
+            ],
+            author=author,
+        )
+    g.build()
+    state = _state(g, clock.now())
+    narrative = next(n for n in state.nodes if n.node_type == "narrative")
+    assert narrative.mentions_7d == 2 and not narrative.dormant
+    links = [e for e in state.edges if narrative.node_id in (e.source, e.target)]
+    assert len(links) == 2 and {e.status for e in links} == {"confirmed"}

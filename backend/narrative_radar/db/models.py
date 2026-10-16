@@ -498,6 +498,9 @@ class Viewer(Base):
     viewer_id: Mapped[str] = mapped_column(ID, primary_key=True)
     created_at: Mapped[datetime]
     last_seen_at: Mapped[datetime]
+    # 이번 방문 묶음이 시작되기 전 마지막으로 본 시각 ("지난 방문 이후"의 기준).
+    # 새로고침으로는 바뀌지 않는다.
+    previous_seen_at: Mapped[datetime | None]
 
 
 class ViewerOverlay(Base):

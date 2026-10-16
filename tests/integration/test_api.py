@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -93,16 +93,29 @@ def test_changes_and_node_and_edge_details(api):
     assert detail["node"]["membership"] == "admitted"
 
 
+def test_visit_baseline_survives_reloads(api, clock):
+    client, *_ = api
+    first = client.post("/api/viewer/visit").json()
+    assert first["previous_seen_at"] is None
+    seen = clock.now()
+    clock.advance(timedelta(minutes=5))
+    reload = client.post("/api/viewer/visit").json()  # 새로고침은 같은 방문
+    assert reload["viewer_id"] == first["viewer_id"] and reload["previous_seen_at"] is None
+    clock.advance(timedelta(days=2))
+    back = client.post("/api/viewer/visit").json()
+    assert datetime.fromisoformat(back["previous_seen_at"]) == seen + timedelta(minutes=5)
+    clock.advance(timedelta(minutes=1))
+    # 다시 와서 새로고침해도 "지난 방문 이후" 기준은 그대로다
+    assert client.post("/api/viewer/visit").json()["previous_seen_at"] == back["previous_seen_at"]
+
+
 def test_viewer_visit_overlay_and_saved_views(api):
     client, t0, t1, t2 = api
     assert (
         client.post("/api/overlays", json={"target_id": "x", "decision": "hidden"}).status_code
         == 401
     )
-    first = client.post("/api/viewer/visit").json()
-    assert first["previous_seen_at"] is None
-    second = client.post("/api/viewer/visit").json()
-    assert second["viewer_id"] == first["viewer_id"] and second["previous_seen_at"] is not None
+    client.post("/api/viewer/visit")
 
     state = client.get("/api/state").json()
     hbm = next(n for n in state["nodes"] if n["canonical_key"] == "TECH:hbm")

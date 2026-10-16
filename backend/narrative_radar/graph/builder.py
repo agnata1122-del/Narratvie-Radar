@@ -195,6 +195,8 @@ class GraphBuilder:
 
             narrative_node = self._narrative_for(c, claim, now, cause, report)
             if narrative_node is not None:
+                # 내러티브를 지지·반박한 글은 그 내러티브를 언급한 글로 센다 (관심도·휴면 판정)
+                self._mention(narrative_node, doc, now)
                 for target in (src, dst):
                     nedge, created = self._edge(
                         narrative_node, target, EdgeType.RELATED_TO, now, cause, doc
