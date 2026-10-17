@@ -35,7 +35,12 @@ from narrative_radar.schemas.classification import (
     ClassificationOutput,
     ClassificationRecord,
 )
-from narrative_radar.schemas.enums import ClassificationStatus, ContentAccessStatus, NodeType
+from narrative_radar.schemas.enums import (
+    ClassificationStatus,
+    ContentAccessStatus,
+    NodeType,
+    ProfileNodeStatus,
+)
 
 # v2: 분야와 무관한 공통 지침 (DECISIONS D22). 실제 기록에는 도메인 팩 버전을 붙인다.
 PROMPT_VERSION = "classification.v2"
@@ -53,6 +58,9 @@ def guidelines_for(pack: DomainPack) -> list[Path]:
 
 MAX_TEXT_CHARS = 4000
 MAX_PARENT_CHARS = 500
+MAX_KNOWN_NODES = 20  # 글마다 붙이는 기존 노드 단서
+# 온톨로지가 이보다 크면 관심사 트리의 노드와 이번 글들에 나온 노드만 넘긴다 (광역 수집으로 커진다)
+MAX_CONTEXT_NODES = 400
 
 
 def pending_documents(
@@ -90,12 +98,28 @@ def _text(session: Session, doc: Document) -> str:
     return "\n".join(part for part in (doc.title, body) if part)
 
 
+def _tree_keys(session: Session) -> set[str]:
+    """관심사 트리에 들어 있는(포함 결정이 난) 노드의 키."""
+    from narrative_radar.discovery.expansion import latest_decisions
+
+    node_ids: set[str] = set()
+    for profile_id in session.scalars(sa.select(InterestProfile.profile_id)):
+        node_ids |= {
+            node_id
+            for node_id, status in latest_decisions(session, profile_id).items()
+            if status == ProfileNodeStatus.ADMITTED
+        }
+    return set(session.scalars(sa.select(Node.canonical_key).where(Node.node_id.in_(node_ids))))
+
+
 def export_batch(
     session: Session, clock: Clock, limit: int, out_dir: Path, pack: DomainPack
 ) -> tuple[Path, Path, int]:
     """batch.jsonl(글)과 context.json(온톨로지·규칙·지침)을 쓴다. 글 수를 돌려준다."""
     out_dir.mkdir(parents=True, exist_ok=True)
     docs = pending_documents(session, limit, prompt_version_for(pack))
+    ontology = load_ontology(session)
+    mentioned: set[str] = set()
     parent = aliased(Document)
     batch_path = out_dir / "batch.jsonl"
     with batch_path.open("w", encoding="utf-8") as f:
@@ -111,15 +135,28 @@ def export_batch(
                 )
                 if p is not None:
                     parent_text = _text(session, p)[:MAX_PARENT_CHARS]
+            text = _text(session, doc)[:MAX_TEXT_CHARS]
+            known = ontology.matching(f"{text}\n{parent_text or ''}", MAX_KNOWN_NODES)
+            mentioned |= {n.canonical_key for n in known}
             line = {
                 "document_id": doc.document_id,
                 "content_hash": doc.content_hash,
                 "source": doc.source,
                 "published_at": doc.published_at.isoformat(),
-                "text": _text(session, doc)[:MAX_TEXT_CHARS],
+                # 본문 없이 제목만 있는 글 (발견 공급자가 준 헤드라인, D25)
+                "headline_only": session.get(RawDocument, doc.document_id) is None,
+                "text": text,
                 "parent_text": parent_text,
+                # 이 글에 이름·별칭이 나온 기존 노드. 같은 대상이면 이 키를 쓴다
+                "known_nodes": [
+                    {"canonical_key": n.canonical_key, "label": n.label} for n in known
+                ],
             }
             f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    truncated = len(ontology.nodes) > MAX_CONTEXT_NODES
+    if truncated:
+        keep = sorted(_tree_keys(session) | mentioned)[:MAX_CONTEXT_NODES]
+        ontology = ontology.only(keep)
     context_path = out_dir / "context.json"
     context = {
         "exported_at": clock.now().isoformat(),
@@ -128,7 +165,9 @@ def export_batch(
         "domain": {"id": pack.id, "name": pack.name, "version": pack.version},
         "interests": _interests(session, pack),
         "guidelines": [str(g) for g in guidelines_for(pack)],
-        "ontology": load_ontology(session).to_dict(pack),
+        "ontology": ontology.to_dict(pack),
+        # 잘렸으면 여기 없는 노드도 있다. 새 키를 만들기 전에 known_nodes와 별칭을 먼저 본다
+        "ontology_truncated": truncated,
     }
     context_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
     return batch_path, context_path, len(docs)

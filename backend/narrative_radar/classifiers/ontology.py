@@ -1,16 +1,30 @@
 """분류할 때 함께 넘기는 현재 온톨로지와 키 규칙."""
 
-from dataclasses import asdict, dataclass
+import re
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, replace
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from narrative_radar.db.models import Narrative, Node, NodeAlias
 from narrative_radar.domains import DomainPack, valid_key
+from narrative_radar.normalization.text import normalize_text
 from narrative_radar.schemas.enums import NodeStatus, NodeType
 
 # 키 규칙은 도메인 팩이 정한다 (공통 규칙 + 팩 규칙, DECISIONS D22)
-__all__ = ["Ontology", "load_ontology", "valid_key"]
+__all__ = ["Ontology", "load_ontology", "mentions", "valid_key"]
+
+
+def mentions(text_normalized: str, name_normalized: str) -> bool:
+    """정규화한 글에 정규화한 표기가 나오는가."""
+    if not name_normalized:
+        return False
+    if name_normalized.isascii():
+        # 영문 표기는 단어 경계로 찾는다 ("nvda"가 다른 단어 안에 걸리지 않게)
+        pattern = rf"(?<![a-z0-9]){re.escape(name_normalized)}(?![a-z0-9])"
+        return re.search(pattern, text_normalized) is not None
+    return name_normalized in text_normalized
 
 
 @dataclass(frozen=True)
@@ -39,6 +53,21 @@ class Ontology:
             "narratives": [asdict(n) for n in self.narratives],
             "key_rules": pack.key_rules(),
         }
+
+    def matching(self, text: str, limit: int | None = None) -> list[OntologyNode]:
+        """글에 이름이나 별칭이 나오는 노드. 분류할 때 기존 노드에 잇는 단서로 쓴다."""
+        normalized = normalize_text(text)
+        out = []
+        for node in self.nodes:
+            if any(mentions(normalized, normalize_text(n)) for n in (node.label, *node.aliases)):
+                out.append(node)
+                if limit is not None and len(out) >= limit:
+                    break
+        return out
+
+    def only(self, keys: Iterable[str]) -> "Ontology":
+        wanted = set(keys)
+        return replace(self, nodes=[n for n in self.nodes if n.canonical_key in wanted])
 
 
 def load_ontology(session: Session) -> Ontology:

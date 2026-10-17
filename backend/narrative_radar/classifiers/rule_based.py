@@ -3,9 +3,7 @@
 세션 분류와 비교하는 기준선이며, 테스트에서 LLM 없이 파이프라인을 돌리는 데 쓴다.
 """
 
-import re
-
-from narrative_radar.classifiers.ontology import Ontology
+from narrative_radar.classifiers.ontology import Ontology, mentions
 from narrative_radar.normalization.text import normalize_text
 from narrative_radar.schemas.classification import ClassificationOutput, EntityMention
 from narrative_radar.schemas.enums import NodeType, Stance
@@ -13,19 +11,12 @@ from narrative_radar.schemas.enums import NodeType, Stance
 MODEL_LABEL = "rule-based.v1"
 
 
-def _contains(text: str, alias: str) -> bool:
-    if alias.isascii():
-        # 영문 별칭은 단어 경계로 찾는다 ("nvda"가 다른 단어 안에 걸리지 않게)
-        return re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", text) is not None
-    return alias in text
-
-
 def classify(text: str, ontology: Ontology, root_key: str) -> ClassificationOutput:
     normalized = normalize_text(text)
     entities: list[EntityMention] = []
     for node in ontology.nodes:
         names = [node.label, *node.aliases]
-        hit = next((n for n in names if _contains(normalized, normalize_text(n))), None)
+        hit = next((n for n in names if mentions(normalized, normalize_text(n))), None)
         if hit is not None:
             entities.append(
                 EntityMention(

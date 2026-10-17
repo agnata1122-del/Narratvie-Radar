@@ -71,12 +71,9 @@ class EntityResolver:
         if name in index:
             return Resolution(mention, self.follow_merges(index[name]), None, "alias")
         if len(name) >= FUZZY_MIN_LENGTH:
-            best = max(
-                ((SequenceMatcher(None, name, a).ratio(), nid) for a, nid in index.items()),
-                default=(0.0, ""),
-            )
-            if best[0] >= FUZZY_THRESHOLD:
-                return Resolution(mention, self.follow_merges(best[1]), None, "fuzzy")
+            best = _closest(name, index)
+            if best is not None:
+                return Resolution(mention, self.follow_merges(best), None, "fuzzy")
 
         if key and valid_key(mention.type, key):
             return Resolution(mention, None, key, "new")
@@ -87,3 +84,20 @@ class EntityResolver:
             "rejected",
             f"no existing node and no valid key for {mention.name!r}",
         )
+
+
+def _closest(name: str, index: dict[str, str]) -> str | None:
+    """유사도가 기준 이상인 가장 가까운 별칭의 노드. 별칭이 많아도 빠르도록 길이와 빠른 상한으로
+    먼저 거른다 (두 길이로 낼 수 있는 최대 유사도 2·짧은쪽/합이 기준보다 낮으면 볼 필요가 없다)."""
+    best_score, best_node = FUZZY_THRESHOLD, None
+    for alias, node_id in index.items():
+        shorter, total = min(len(name), len(alias)), len(name) + len(alias)
+        if 2 * shorter / total < best_score:
+            continue
+        matcher = SequenceMatcher(None, name, alias)
+        if matcher.real_quick_ratio() < best_score or matcher.quick_ratio() < best_score:
+            continue
+        score = matcher.ratio()
+        if score >= best_score and (best_node is None or score > best_score):
+            best_score, best_node = score, node_id
+    return best_node

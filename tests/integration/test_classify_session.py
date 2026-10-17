@@ -187,3 +187,46 @@ def test_key_rules():
     assert valid_key(NodeType.TOPIC, "TOPIC:data-center-power")
     assert not valid_key(NodeType.TOPIC, "TOPIC:Data Center")
     assert not valid_key(NodeType.TECHNOLOGY, "TOPIC:hbm")
+
+
+def test_export_points_each_post_at_known_nodes_and_trims_a_large_ontology(
+    session, clock, tmp_path, monkeypatch
+):
+    from narrative_radar.classifiers import session as session_mod
+    from narrative_radar.core.ids import new_id
+    from narrative_radar.db.models import Node
+    from narrative_radar.schemas.enums import NodeStatus
+
+    _, a, b, cls_run = _setup(session, clock)
+    session.add(
+        Node(
+            node_id=new_id("nod", clock.now()),
+            canonical_key="TOPIC:example-topic",
+            node_type=NodeType.TOPIC,
+            label="example topic",
+            status=NodeStatus.ACTIVE,
+            created_at=clock.now(),
+            available_at=clock.now(),
+            created_run_id=cls_run,
+        )
+    )
+    session.flush()
+    monkeypatch.setattr(session_mod, "MAX_CONTEXT_NODES", 1)
+    batch, context, _ = export_batch(session, clock, 10, tmp_path, get_pack("finance"))
+    by_id = {line["document_id"]: line for line in map(json.loads, batch.read_text().splitlines())}
+    assert by_id[a]["known_nodes"] == [{"canonical_key": "US:NVDA", "label": "NVIDIA"}]
+    assert by_id[b]["known_nodes"] == by_id[a]["known_nodes"]  # 부모 글에서 나온 단서
+    assert by_id[a]["headline_only"] is False
+    ctx = json.loads(context.read_text())
+    assert ctx["ontology_truncated"] is True
+    # 관심사 트리와 이번 글들에 나온 노드만 남는다
+    assert [n["canonical_key"] for n in ctx["ontology"]["nodes"]] == ["US:NVDA"]
+
+
+def test_ontology_matching_uses_word_boundaries_for_latin_names(session, clock):
+    _setup(session, clock)
+    ontology = load_ontology(session)
+    assert [n.canonical_key for n in ontology.matching("엔비디아 실적 이야기")] == ["US:NVDA"]
+    assert ontology.matching("the nvdaq index") == []
+    assert ontology.only(["US:NVDA"]).nodes == ontology.nodes
+    assert ontology.only([]).nodes == []
