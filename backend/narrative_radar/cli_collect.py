@@ -162,7 +162,13 @@ def collect_reddit(
                 session, ctx.clock.now(), limit=ctx.settings.max_hn_terms, ascii_only=True
             )
         )
-    client = PoliteClient(ctx.settings.user_agent, guard=ctx.guard())
+    # Arctic Shift는 서버 시간 초과를 422로 알린다. 간격을 두고 두 번까지 다시 묻는다
+    client = PoliteClient(
+        ctx.settings.user_agent,
+        guard=ctx.guard(),
+        transient_retries=2,
+        transient_statuses=(422,),
+    )
     collector = RedditArcticCollector(
         client,
         hasher,

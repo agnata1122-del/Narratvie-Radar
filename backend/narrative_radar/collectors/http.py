@@ -5,6 +5,7 @@
   이후 요청도 모두 거부한다.
 - 예외: transient_retries를 주면 연결 끊김·시간 초과·5xx 같은 일시 오류는 간격을 두고 그만큼만
   다시 시도한다(DECISIONS D25). 차단 신호(401·403·429 등)는 다시 시도하지 않는다. 기본값 0.
+  서버가 일시 오류에 다른 코드를 쓰면 transient_statuses로 더한다(차단 신호는 넣지 않는다).
 - 정직한 User-Agent를 쓰고 브라우저로 위장하지 않는다.
 - robots.txt를 확인해 금지된 경로는 요청하지 않는다. Crawl-delay가 더 길면 그것을 따른다.
 - GET만 지원한다. 글쓰기·로그인 같은 요청은 만들 수 없다.
@@ -46,6 +47,7 @@ class PoliteClient:
         transient_retries: int = 0,
         retry_backoff_seconds: Sequence[float] = (15.0, 45.0),
         sleep: Callable[[float], None] = time.sleep,
+        transient_statuses: Sequence[int] = (),
     ) -> None:
         if "mozilla" in user_agent.lower():
             raise ValueError("user agent must identify this project, not impersonate a browser")
@@ -55,6 +57,8 @@ class PoliteClient:
         self.stats = RequestStats()
         self.transient_retries = transient_retries
         self.retry_backoff_seconds = tuple(retry_backoff_seconds) or (0.0,)
+        # 5xx 말고도 그 서버가 일시 오류로 쓰는 상태 코드 (예: Arctic Shift의 422 시간 초과)
+        self.transient_statuses = frozenset(transient_statuses)
         self._sleep = sleep
         self._robots: dict[str, RobotFileParser] = {}
         self._client = httpx.Client(
@@ -100,7 +104,10 @@ class PoliteClient:
                     continue
                 self.guard.observe_exception(url, e)
                 raise CollectionBlocked(self.guard.tripped_reason) from e
-            if response.status_code >= 500 and retry_left:
+            transient = (
+                response.status_code >= 500 or response.status_code in self.transient_statuses
+            )
+            if transient and retry_left:
                 self.stats.failures += 1
                 self._back_off(attempt)
                 attempt += 1

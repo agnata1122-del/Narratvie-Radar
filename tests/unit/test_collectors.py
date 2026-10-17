@@ -214,7 +214,7 @@ def _flaky(responses):
     return handler
 
 
-def _retrying(handler, retries=2):
+def _retrying(handler, retries=2, statuses=()):
     sleeps: list[float] = []
     client = PoliteClient(
         "NarrativeRadar/test",
@@ -223,6 +223,7 @@ def _retrying(handler, retries=2):
         transient_retries=retries,
         retry_backoff_seconds=(15.0, 45.0),
         sleep=sleeps.append,
+        transient_statuses=statuses,
     )
     return client, sleeps
 
@@ -245,6 +246,17 @@ def test_transient_errors_are_retried_a_limited_number_of_times():
     with pytest.raises(CollectionBlocked):
         client.get("https://example.com/x")
     assert client.guard.tripped_kind == TripKind.ERROR and len(sleeps) == 2
+
+
+def test_extra_transient_statuses_are_retried_only_when_configured():
+    client, sleeps = _retrying(
+        _flaky([httpx.Response(422), httpx.Response(200, json={})]), statuses=(422,)
+    )
+    assert client.get("https://example.com/x").status_code == 200 and sleeps == [15.0]
+
+    client, _ = _retrying(_flaky([httpx.Response(422)]))
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/x")
 
 
 def test_block_signals_are_never_retried():
