@@ -47,17 +47,18 @@ def resolve_instruments(
     ctx: RunContext, source: TossPriceSource, keys: list[str], report: PriceReport
 ) -> list[Instrument]:
     raw = _get_cursor(ctx, INSTRUMENTS_KEY)
-    cached: dict[str, dict[str, str]] = dict(raw) if isinstance(raw, dict) else {}
+    cached: dict[str, dict[str, str | None]] = dict(raw) if isinstance(raw, dict) else {}
     out = []
     for key in keys:
         if key in cached:
-            out.append(Instrument(key, cached[key]["market"], cached[key]["code"]))
+            entry = cached[key]
+            out.append(Instrument(key, entry["market"], entry["code"], entry.get("currency")))
             continue
         inst = source.resolve(key)
         if inst is None:
             report.unknown.append(key)
             continue
-        cached[key] = {"market": inst.market, "code": inst.code}
+        cached[key] = {"market": inst.market, "code": inst.code, "currency": inst.currency}
         out.append(inst)
     with ctx.sessions.begin() as session:
         _set_cursor(session, ctx, INSTRUMENTS_KEY, cached)

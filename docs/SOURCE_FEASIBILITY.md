@@ -56,11 +56,34 @@ uv run nr sources report --hours 2
 
 ## 결과
 
-아직 실행하지 않았다. (이 개발 환경은 위 도메인이 네트워크 정책으로 막혀 있다.)
+### 첫 접속 확인 (spike, 2026-10-17 07:19–07:27 UTC, 클라우드 세션)
 
-| 소스 | 실행 일시 | 시간 | 글 수 | 지연 | 대역폭 | 중단 | 메모 |
+소유자 결정으로 `toss_prices`, `gdelt`, `hackernews`, `bluesky_jetstream`을 켜고 한 번씩 돌렸다(D15·D25·D27). `web`, `dcinside_stockus`, `naver_world_nvda`는 켜지 않았고, 토스증권 커뮤니티는 보류 중이라 요청하지 않았다. 1–2시간 연속 실행은 아직 하지 않았다.
+
+- 환경: `NR_LIVE_COLLECTION_ENABLED=true`, salt 설정됨. 여섯 호스트 모두 접속됨(`/robots.txt` 응답: firebaseio·public.api.bsky.app 200, 나머지 404 = 제한 없음). `RobotsDisallowed`는 없었다.
+
+| 소스 | 실행 일시 (UTC) | 시간 | 글 수 | 지연 | 대역폭 | 중단 | 메모 |
 |---|---|---|---|---|---|---|---|
-| Hacker News | | | | | — | | |
-| Bluesky | | | | | | | |
-| GDELT (발견) | | | | | — | | |
-| 토스증권 시세 | | | | | — | | |
+| Hacker News | 2026-10-17 07:21:52 | 7초 (1주기, 4시간 거슬러) | 7 (live 1, backfill 6), 스냅숏 1 | 중앙값 469초 (대부분 lookback으로 늦게 본 글) | — | 없음 | 응답 형식 그대로 파싱됨. 삭제 0 |
+| Bluesky | 2026-10-17 07:22:00 | 5분 | 5 (이벤트 9,245건, 게시물 8,371건 중) | 중앙값 0.04초 | 7.46MB / 300초 ≈ 25KB/s (하루 약 2.1GB 추정) | 없음 | malformed 0, 재연결 0, 삭제 이벤트 646, 계정 삭제·정지 60. 지표 재방문은 대상 없음(0건) |
+| GDELT (발견) | 2026-10-17 07:21:35 | 첫 요청에서 멈춤 | 0 | — | — | **`stopped`** | robots.txt(404)는 받았고, 첫 DOC API 요청(`NVIDIA OR NVDA OR "NVIDIA Corporation"`)에서 서버가 응답 없이 연결을 끊었다(`RemoteProtocolError: Server disconnected without sending a response`). 에이전트 프록시에는 중계 실패 기록이 없었다. 규칙대로 다시 켜지 않았다. `seendate`·결과 없음·검색어 오류 응답 형식은 확인하지 못했다 |
+| 토스증권 시세 | 2026-10-17 07:19:38 | 7초 | 일봉 126개 (`US:NVDA`, 2026-04-20–2026-10-16) | — | — | 없음 | 요청 2회(robots.txt 포함), 아래 형식 메모 |
+
+### 토스증권 시세 형식 (D27 확인 항목)
+
+실제 값은 적지 않는다. 구조만 기록한다.
+
+- **상품 코드**: `code-or-symbol/NVDA`는 `result`로 감싼 종목 정보를 준다. `code`는 `US` + 숫자 11자리(예: `US00000000001` 꼴)이고 `symbol`, `currency`(`"USD"`), `market`(`{code, displayName}`) 등이 함께 온다.
+- **응답 감싸기**: 종목 정보와 일봉 모두 `{"result": {...}}`.
+- **일봉 `dt`**: 거래소 현지 자정에 현지 UTC 오프셋이 붙은 ISO 시각. 미국 `2026-10-16T00:00:00-04:00`, 한국 `2026-10-16T00:00:00+09:00` 꼴. 기존 파서가 그대로 현지 날짜로 읽는다.
+- **통화**: 일봉 응답에는 `currency`가 없고 `code`, `nextDateTime`, `exchangeRate`, `candles`(한국은 `exchange: "krx"`도)만 있다. 미국 종목 봉 값은 **달러**이고 `exchangeRate`는 원화 환율이다(한국 종목은 1). 원화 환산값이 아니므로 변화율 비교에 환율이 섞이지 않는다.
+- **봉 필드**: `dt`, `base`, `open`, `high`, `low`, `close`(실수), `volume`, `amount`(정수).
+- **페이지 넘김**: `nextDateTime`은 다음 페이지 첫 봉의 `dt`다. `from=<nextDateTime>`으로 넘기면 겹치지 않고 이어진다(휴장일은 빠진다). 미국·한국 모두 확인.
+- **한국 종목 경로**: `KR:000660` → `A000660`, `kr-s` 차트를 `TossPriceSource.daily_bars`로 한 번 읽었다(저장하지 않음). 형식 문제 없음.
+- **코드 수정**: 일봉에 통화가 없어 `currency`가 비던 것을, 종목 정보의 `currency`를 `Instrument`에 담아 쓰게 고쳤다(한국 종목은 종목 정보를 조회하지 않으므로 비어 있고, 화면은 한국 종목을 원화로 표시한다). `tests/unit/test_prices.py` 예시를 실제 구조로 맞췄다.
+
+### 남은 일
+
+- GDELT: 원인(서버 쪽 연결 끊김 — 요청 간격·검색어 길이·일시 장애 중 무엇인지)을 소유자가 확인한 뒤 `nr sources reset gdelt --reason ...` → `enable`로 다시 시도한다. 그때 `seendate`·빈 결과·검색어 오류 형식을 확인한다.
+- HN·Bluesky 1–2시간 연속 실행, Jetstream이 몇 시간 전까지 다시 보내 주는지(커서 재생 범위).
+- Bluesky 대역폭이 하루 약 2GB로 추정된다. 상시 수집 전에 Jetstream 압축 옵션을 검토한다.

@@ -60,6 +60,7 @@ class Instrument:
     canonical_key: str
     market: str  # US / KR
     code: str  # 토스증권 상품 코드
+    currency: str | None = None  # 종목 정보의 통화. 일봉 응답에는 통화가 없다
 
 
 @dataclass(frozen=True)
@@ -101,7 +102,10 @@ class TossPriceSource:
         code = info.get("code")
         if not isinstance(code, str) or not code:
             self._parse_failed(f"stock info for {ticker} has no product code")
-        return Instrument(canonical_key, market, code)
+        currency = info.get("currency")
+        return Instrument(
+            canonical_key, market, code, currency if isinstance(currency, str) else None
+        )
 
     def daily_bars(self, inst: Instrument, since: date | None) -> list[DailyBar]:
         """since 이후(그날 포함)의 끝난 일봉. 최신부터 받아 since에 닿거나 페이지 상한에서
@@ -124,7 +128,10 @@ class TossPriceSource:
             candles = body.get("candles")
             if not isinstance(candles, list):
                 self._parse_failed("chart response has no candles list")
-            currency = body.get("currency") if isinstance(body.get("currency"), str) else None
+            # 미국 종목 일봉은 달러 값이고, 응답에는 통화 대신 원화 환율(`exchangeRate`)만 있다.
+            currency = body.get("currency")
+            if not isinstance(currency, str):
+                currency = inst.currency
             for candle in candles:
                 bar = self._bar(candle, inst, currency)
                 bars[bar.bar_date] = bar

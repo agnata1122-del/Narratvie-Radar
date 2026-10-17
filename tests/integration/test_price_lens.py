@@ -44,7 +44,7 @@ def fake_toss(us_close=50, kr_close=100):
         if path == "/robots.txt":
             return httpx.Response(404)
         if path == "/api/v2/stock-infos/code-or-symbol/NVDA":
-            return httpx.Response(200, json={"result": {"code": US_CODE}})
+            return httpx.Response(200, json={"result": {"code": US_CODE, "currency": "USD"}})
         days = ["2026-10-16", "2026-10-15", "2026-10-14"]  # 최신부터
         if path == f"/api/v1/c-chart/us-s/{US_CODE}/day:1":
             return httpx.Response(200, json={"result": {"candles": candles(days, us_close)}})
@@ -93,7 +93,7 @@ def test_tree_tickers_across_markets_are_collected_and_served_without_future_bar
     assert (first.created, first.updated) == (6, 0)
     with session_factory() as s:
         cached = s.get(SourceAdapter, "toss_prices").config["instruments"]
-        assert cached["US:NVDA"] == {"market": "US", "code": US_CODE}
+        assert cached["US:NVDA"] == {"market": "US", "code": US_CODE, "currency": "USD"}
 
     # 다시 받으면 겹치는 날은 덮어쓴다 (수정주가)
     second = run(fake_toss(us_close=60))
