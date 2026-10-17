@@ -95,13 +95,15 @@ def test_post_and_comment_map_to_unverified_documents():
 
 
 def test_keyword_results_are_rechecked_and_removed_items_skipped():
+    disliked = {**COMMENT, "id": "c12", "score": -6}
     noise = {**COMMENT, "id": "c10", "body": "me da envidia"}
     removed = {**COMMENT, "id": "c11", "body": "[removed]"}
-    c = make([noise, removed, COMMENT])
+    c = make([noise, removed, COMMENT, disliked])
     docs = c.fetch(
         Query("comments", "wallstreetbets", "NVDA"), NOW - timedelta(days=60), NOW
     ).documents
-    assert [d.external_id for d in docs] == ["t1_c9"]
+    assert [d.external_id for d in docs] == ["t1_c9", "t1_c12"]
+    assert docs[1].metrics.upvote_count is None  # 음수 점수
 
 
 def test_full_page_continues_from_newest_item(monkeypatch):

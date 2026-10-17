@@ -140,7 +140,7 @@ class RedditArcticCollector:
                 external_id, parent, thread = f"t3_{rid}", None, f"t3_{rid}"
                 url = f"https://www.reddit.com/r/{sub}/comments/{rid}/"
                 metrics = MetricsIn(
-                    upvote_count=item.get("score"), comment_count=item.get("num_comments")
+                    upvote_count=_score(item), comment_count=item.get("num_comments")
                 )
                 if title in REMOVED:
                     return None
@@ -152,7 +152,7 @@ class RedditArcticCollector:
                 link_id = str(item["link_id"])
                 external_id, parent, thread = f"t1_{rid}", str(item["parent_id"]), link_id
                 url = f"https://www.reddit.com/r/{sub}/comments/{link_id.removeprefix('t3_')}/_/{rid}/"
-                metrics = MetricsIn(upvote_count=item.get("score"))
+                metrics = MetricsIn(upvote_count=_score(item))
         except (KeyError, TypeError, ValueError) as e:
             self._parse_failed(f"unexpected item shape: {e!r}")
 
@@ -186,6 +186,12 @@ class RedditArcticCollector:
     def _parse_failed(self, reason: str) -> NoReturn:
         self.client.guard.trip(TripKind.ERROR, f"parse failed: {reason}")
         raise CollectionBlocked(reason)
+
+
+def _score(item: Any) -> int | None:
+    """Reddit 점수는 추천−비추천이라 음수가 될 수 있다. 추천 수 칸에는 0 이상만 둔다."""
+    score = item.get("score")
+    return score if isinstance(score, int) and score >= 0 else None
 
 
 def _created(item: Any) -> datetime:
