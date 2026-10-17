@@ -143,6 +143,7 @@ class RedditArcticCollector:
                 text = str(item.get("selftext") or "")
                 if text in REMOVED:
                     text = ""
+                written = text
                 link = str(item.get("url") or "")
                 if link and f"/comments/{rid}" not in link:  # 링크 게시물이면 그 주소를 붙인다
                     text = "\n".join(p for p in (text, link) if p)
@@ -158,6 +159,7 @@ class RedditArcticCollector:
                 text = str(item.get("body") or "")
                 if text in REMOVED:
                     return None
+                written = text
                 link_id = str(item["link_id"])
                 external_id, parent, thread = f"t1_{rid}", str(item["parent_id"]), link_id
                 url = f"https://www.reddit.com/r/{sub}/comments/{link_id.removeprefix('t3_')}/_/{rid}/"
@@ -167,7 +169,8 @@ class RedditArcticCollector:
 
         wanted = (query.term,) if query.term else query.keep_if_any
         if wanted:
-            normalized = normalize_text(f"{title}\n{text}")
+            # 링크 주소(예: /r/NVDA_Stock/…)가 아니라 쓴 글에서만 찾는다
+            normalized = normalize_text(f"{title}\n{written}")
             if not any(term_pattern(t).search(normalized) for t in wanted):
                 return None  # 서버 검색은 넓게 잡는다. 단어 단위로 다시 확인한다
 
