@@ -1,5 +1,5 @@
 // 코드 테스트용 최소 픽스처 (형식 확인용, 실제 수집 글 아님 · DECISIONS D13)
-import type { ChangeReport, EdgeDetail, Frames, Health, NodeDetail, Overview } from '../api'
+import type { ChangeReport, EdgeDetail, Frames, Health, NodeDetail, Overview, Prices } from '../api'
 
 export const T0 = '2026-10-14T00:00:00Z'
 export const T1 = '2026-10-15T00:00:00Z'
@@ -195,3 +195,37 @@ export const edgeDetail: EdgeDetail = {
     { document_id: 'doc_2', source: 'hackernews', published_at: T1, deleted: true, url: null, excerpt: null, evidence_status: null },
   ],
 }
+
+// 시세 형식 예시 (값은 예시, D27). 봉: [거래일, 종가, 그 거래일이 끝난 시각]
+export const prices: Prices = {
+  as_of: T2,
+  series: [
+    {
+      node_id: 'nod_nv',
+      key: 'US:NVDA',
+      label: 'NVIDIA',
+      market: 'US',
+      depth: 0,
+      currency: null,
+      bars: [
+        ['2026-10-12', 100, '2026-10-13T04:00:00Z'],
+        ['2026-10-13', 104, '2026-10-14T04:00:00Z'],
+        ['2026-10-14', 110, '2026-10-15T04:00:00Z'],
+      ],
+    },
+    {
+      node_id: 'nod_skh',
+      key: 'KR:000660',
+      label: 'SK hynix',
+      market: 'KR',
+      depth: 2,
+      currency: 'KRW',
+      bars: [
+        ['2026-10-13', 200, '2026-10-13T15:00:00Z'],
+        ['2026-10-14', 190, '2026-10-14T15:00:00Z'],
+        ['2026-10-15', 180, '2026-10-15T15:00:00Z'],
+      ],
+    },
+  ],
+}
+

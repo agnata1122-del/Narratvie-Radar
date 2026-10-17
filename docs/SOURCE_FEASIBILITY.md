@@ -51,6 +51,7 @@ uv run nr sources report --hours 2
 | 삭제 비율 | report `deleted` | 삭제 반영이 실제로 일어나는지 확인한다 |
 | 자동 중단 | report `health_by_status`, `last_problem` | 1–2시간 안에 멈추면 원인을 기록하고 규칙을 조정할지 논의한다 |
 | GDELT 응답 | `nr discover gdelt` 결과, health note | `seendate` 형식, 결과 없음(`{}`), 검색어 오류 응답(텍스트)이 `tests/integration/test_discovery.py`의 예시와 같은지. 429가 나면 간격(`NR_GDELT_MIN_INTERVAL_SECONDS`)을 늘린다 |
+| 토스증권 시세 | `nr collect prices` 결과, health note | `code-or-symbol/NVDA`가 상품 코드를 주는지, 일봉 `dt` 형식·시간대, 미국 종목 일봉 통화, `from=nextDateTime` 넘김이 `tests/unit/test_prices.py`의 예시와 같은지 |
 | 응답 형식 | 실제 응답과 `tests/unit/test_hackernews.py`, `test_bluesky.py`의 예시 비교 | 다르면 수집기와 테스트 예시를 실제 형식에 맞춘다 |
 
 ## 결과
@@ -62,3 +63,4 @@ uv run nr sources report --hours 2
 | Hacker News | | | | | — | | |
 | Bluesky | | | | | | | |
 | GDELT (발견) | | | | | — | | |
+| 토스증권 시세 | | | | | — | | |

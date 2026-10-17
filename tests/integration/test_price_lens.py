@@ -3,7 +3,7 @@
 응답·가격은 형식 확인용으로 직접 작성한 예시다 (DECISIONS D0 예외).
 """
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -114,7 +114,9 @@ def test_tree_tickers_across_markets_are_collected_and_served_without_future_bar
     by_key = {x["key"]: x for x in body["series"]}
     assert [x["key"] for x in body["series"]] == ["US:NVDA", "KR:000660"]  # 깊이 순서
     assert by_key["KR:000660"]["market"] == "KR" and by_key["US:NVDA"]["market"] == "US"
-    assert by_key["US:NVDA"]["bars"][-1] == ["2026-10-16", 60.0]
+    last = by_key["US:NVDA"]["bars"][-1]
+    assert last[:2] == ["2026-10-16", 60.0]
+    assert datetime.fromisoformat(last[2]) == datetime(2026, 10, 17, 4, 0, tzinfo=UTC)
 
     # 재생: 뉴욕의 10-16 거래일은 UTC 10-17 04:00에 끝난다. 그 전에는 안 보인다
     before = "2026-10-17T03:59:00+00:00"

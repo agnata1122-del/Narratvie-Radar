@@ -7,6 +7,7 @@ import type { Highlight, Selection } from './components/GraphView'
 import Header from './components/Header'
 import Inspector from './components/Inspector'
 import Legend from './components/Legend'
+import { MarketStrip } from './components/MarketStrip'
 import Timeline, { type RangeDays } from './components/Timeline'
 import { SparkIcon } from './components/icons'
 import { Muted, Panel, Skeleton, Switch } from './components/ui'
@@ -84,6 +85,13 @@ export default function App() {
     enabled: range !== null,
     ...once,
   })
+  // 트리 속 미국·한국 종목의 일봉 (D27). 시세를 받은 적이 없으면 빈 목록이라 화면이 그대로다
+  const prices = useQuery({
+    queryKey: ['prices', profileId, range?.start, range?.end],
+    queryFn: ({ signal }) => api.prices(profileId, range!.start, range!.end, signal),
+    enabled: range !== null && hasGraph,
+    ...once,
+  })
 
   // 재생 위치는 어떤 프레임 묶음에 대한 것인지와 함께 둔다. 범위·가지가 바뀌면 최신 시점으로 돌아간다.
   const [cursor, setCursor] = useState<{ frames: Frames; i: number } | null>(null)
@@ -133,6 +141,9 @@ export default function App() {
     setHighlight(null)
     setActiveChange(null)
   }, [])
+  const presentIds = useMemo(() => new Set(Object.keys(f?.frames[index]?.nodes ?? {})), [f, index])
+  const selectedNodeId = selection?.kind === 'node' ? selection.id : null
+  const selectedPrice = prices.data?.series.find((s) => s.node_id === selectedNodeId) ?? null
 
   // 가지 이동: 선택·강조·재생 위치를 비우고 새 루트에서 다시 시작한다
   const openProfile = useCallback((id: string | null, push = true) => {
@@ -372,10 +383,24 @@ export default function App() {
               onPivot={pivot}
               pivoting={pivoting}
               onOpenProfile={openProfile}
+              price={selectedPrice}
+              range={range}
             />
           )}
         </Panel>
       </main>
+
+      {range && asOf && prices.data && (
+        <MarketStrip
+          series={prices.data.series}
+          asOf={asOf}
+          start={range.start}
+          end={range.end}
+          presentIds={presentIds}
+          selectedId={selectedNodeId}
+          onSelect={(id) => select({ kind: 'node', id })}
+        />
+      )}
 
       {f && f.frames.length > 1 && (
         <Timeline

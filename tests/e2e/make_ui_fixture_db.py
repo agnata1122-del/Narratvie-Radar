@@ -17,9 +17,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "integration"))
 
 from graphkit import HBM, NV, POWER, SKH, GraphKit  # noqa: E402
 
+from narrative_radar.collectors.prices import MARKETS, day_closes_at  # noqa: E402
 from narrative_radar.core.clock import FixedClock  # noqa: E402
+from narrative_radar.core.ids import new_id  # noqa: E402
 from narrative_radar.db.migrate import upgrade_to_head  # noqa: E402
-from narrative_radar.db.models import Document  # noqa: E402
+from narrative_radar.db.models import Document, PriceBar  # noqa: E402
 from narrative_radar.db.session import make_engine, make_session_factory  # noqa: E402
 from narrative_radar.ingest.health import record_health  # noqa: E402
 from narrative_radar.ingest.runs import start_run  # noqa: E402
@@ -93,6 +95,46 @@ def claim(s, p, o, **extra):
     return (s[0], p, o[0], {"excerpt": f"fixture claim: {s[0]} {p} {o[0]}", **extra})
 
 
+# 형식 확인용 예시 가격 (실제 시세 아님, D27): 종목마다 정해진 기울기와 흔들림으로 만든 값
+FIXTURE_PRICES = {
+    "US:NVDA": (100.0, 0.012),
+    "US:AMD": (80.0, -0.006),
+    "KR:000660": (200000.0, 0.009),
+    "KR:005930": (60000.0, -0.004),
+}
+
+
+def add_price_bars(session, clock) -> None:
+    run_id = start_run(session, clock, RunKind.COLLECT).run_id
+    now = clock.now()
+    for key, (base, slope) in FIXTURE_PRICES.items():
+        market = key.split(":")[0]
+        for i in range(21, 0, -1):
+            day = (now - timedelta(days=i)).astimezone(MARKETS[market].tz).date()
+            if day.weekday() >= 5:
+                continue
+            step = 21 - i
+            close = base * (1 + slope * step + 0.008 * ((step * 7) % 5 - 2))
+            session.add(
+                PriceBar(
+                    bar_id=new_id("pbr", now),
+                    source_adapter_id="toss_prices",
+                    canonical_key=key,
+                    interval="1d",
+                    bar_date=day,
+                    open=close,
+                    high=close * 1.01,
+                    low=close * 0.99,
+                    close=close,
+                    volume=None,
+                    currency="KRW" if market == "KR" else None,
+                    closes_at=day_closes_at(market, day),
+                    fetched_at=now,
+                    run_id=run_id,
+                )
+            )
+
+
 def main(out: Path) -> None:
     if out.exists():
         out.unlink()
@@ -162,6 +204,8 @@ def main(out: Path) -> None:
             narrative_proposition="Data center power caps AI build-out",
         )
         tick(1)
+        add_price_bars(session, clock)
+        session.commit()
     engine.dispose()
     print(f"UI fixture DB written to {out} (format-only test data, not real posts)")
 

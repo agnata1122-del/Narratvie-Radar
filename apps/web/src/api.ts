@@ -154,6 +154,19 @@ export type EdgeDetail = {
   }[]
 }
 
+/** 트리 속 미국·한국 종목의 일봉 종가 (D27). 봉: [거래일, 종가, 그 거래일이 끝난 시각] */
+export type PriceBarRow = [string, number, string]
+export type PriceSeries = {
+  node_id: string
+  key: string
+  label: string
+  market: 'US' | 'KR'
+  depth: number | null
+  currency: string | null
+  bars: PriceBarRow[]
+}
+export type Prices = { as_of: string; series: PriceSeries[] }
+
 export type GraphEventRow = { t: string; type: string; cause: string; node_id: string | null; edge_id: string | null }
 export type Gap = ChangeReport['gaps'][number]
 
@@ -214,6 +227,8 @@ export const api = {
   events: (start: string, end: string, signal?: AbortSignal) =>
     getJson<GraphEventRow[]>('/events', { start, end }, signal),
   gaps: (start: string, end: string, signal?: AbortSignal) => getJson<Gap[]>('/gaps', { start, end }, signal),
+  prices: (profileId: string | null, start: string, end: string, signal?: AbortSignal) =>
+    getJson<Prices>('/prices', withProfile({ start, end }, profileId), signal),
   node: (profileId: string | null, id: string, asOf: string, signal?: AbortSignal) =>
     getJson<NodeDetail>(`/nodes/${encodeURIComponent(id)}`, withProfile({ as_of: asOf }, profileId), signal),
   edge: (id: string, asOf: string, signal?: AbortSignal) =>

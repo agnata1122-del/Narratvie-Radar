@@ -256,7 +256,13 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         if not tickers:
             return {"as_of": t, "series": []}
         rows = session.execute(
-            sa.select(PriceBar.canonical_key, PriceBar.bar_date, PriceBar.close, PriceBar.currency)
+            sa.select(
+                PriceBar.canonical_key,
+                PriceBar.bar_date,
+                PriceBar.close,
+                PriceBar.currency,
+                PriceBar.closes_at,
+            )
             .where(
                 PriceBar.canonical_key.in_(tickers),
                 PriceBar.interval == "1d",
@@ -266,10 +272,11 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             )
             .order_by(PriceBar.canonical_key, PriceBar.bar_date)
         ).all()
-        bars: dict[str, dict[str, float]] = {}
+        # 봉마다 [거래일, 종가, 그 거래일이 끝난 시각]. 화면은 재생 시점보다 늦게 끝난 봉을 숨긴다
+        bars: dict[str, dict[str, tuple[float, datetime]]] = {}
         currency: dict[str, str | None] = {}
-        for key, day, close, cur in rows:
-            bars.setdefault(key, {})[day.isoformat()] = close
+        for key, day, close, cur, closes_at in rows:
+            bars.setdefault(key, {})[day.isoformat()] = (close, closes_at)
             currency[key] = cur or currency.get(key)
         series = [
             {
@@ -279,7 +286,7 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
                 "market": market_of(key),
                 "depth": n.depth,
                 "currency": currency.get(key),
-                "bars": [[day, close] for day, close in bars[key].items()],
+                "bars": [[day, close, closes_at] for day, (close, closes_at) in bars[key].items()],
             }
             for key, n in tickers.items()
             if key in bars

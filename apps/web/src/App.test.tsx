@@ -36,6 +36,7 @@ function stubApi({ nodes = 3, failAll = false }: Routes = {}) {
       if (path === '/frames') return Response.json(fx.frames)
       if (path === '/events') return Response.json([{ t: fx.T1, type: 'NODE_CREATED', cause: 'observed_new', node_id: 'nod_hbm', edge_id: null }])
       if (path === '/gaps') return Response.json([])
+      if (path === '/prices') return Response.json(fx.prices)
       if (path === '/changes') return Response.json(fx.changes(q.get('since')!, q.get('until')!))
       if (path.startsWith('/nodes/')) {
         const id = decodeURIComponent(path.slice('/nodes/'.length))
@@ -124,6 +125,26 @@ describe('App', () => {
     expect(screen.getByText('나쁜 링크').closest('a')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'HBM' }))
     expect(await screen.findByRole('heading', { name: 'HBM', level: 2 })).toBeInTheDocument()
+  })
+
+  it('lines up US and KR tickers of the tree on one time axis and hides bars after the playhead', async () => {
+    stubApi()
+    renderApp()
+    const strip = await screen.findByRole('region', { name: '트리 속 종목' })
+    // 구간 시작 직전 종가 대비: NVIDIA 100 → 110, SK하이닉스 200 → 180
+    expect(within(strip).getByRole('button', { name: 'NVIDIA US +10.0%' })).toBeInTheDocument()
+    expect(within(strip).getByRole('button', { name: 'SK hynix KR −10.0%' })).toBeInTheDocument()
+
+    // 하루 전으로: SK하이닉스는 아직 트리에 없고, NVIDIA는 그때까지 끝난 봉만
+    fireEvent.change(screen.getByRole('slider', { name: '재생 시점' }), { target: { value: '1' } })
+    expect(await within(strip).findByRole('button', { name: 'NVIDIA US +4.0%' })).toBeInTheDocument()
+    expect(within(strip).queryByRole('button', { name: /SK hynix/ })).not.toBeInTheDocument()
+
+    // 종목을 누르면 그 노드의 위키 옆에 시세가 붙는다
+    fireEvent.click(within(strip).getByRole('button', { name: /NVIDIA/ }))
+    expect(within(strip).getByRole('button', { name: /NVIDIA/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('일봉 종가')).toBeInTheDocument()
+    expect(screen.getByText('2026-10-13 마감')).toBeInTheDocument()
   })
 
   it('moving the slider back changes the frame and the as-of time of every query', async () => {

@@ -4,7 +4,7 @@
 
 ## 시작 전에 소유자가 할 일
 
-1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
+1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 시세(D27)를 받으려면 `wts-info-api.tossinvest.com`도 추가한다. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
 2. **비밀값**: 같은 설정의 환경변수에 `NR_LIVE_COLLECTION_ENABLED=true`, `NR_AUTHOR_HASH_SALT=<무작위 64자>` 추가. salt는 한 번 정하면 바꾸지 않는다.
 3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소(예: `Narratvie-Radar-data`)를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). 데이터 내보내기·복원 명령은 저장소가 준비되면 만든다.
 
@@ -33,6 +33,7 @@ uv run nr discover plan            # 이번에 검색할 노드·검색식 (요�
 uv run nr discover gdelt           # GDELT로 수집 후보·헤드라인 등록 (D25)
 uv run nr sites list --status pending_review   # 새로 발견된 사이트 (소유자가 검토)
 uv run nr collect web              # 허용된 사이트의 후보를 가져와 본문을 채운다
+uv run nr collect prices           # 트리 속 미국·한국 종목의 일봉 (토스증권 웹 시세, D27)
 
 # 2. 분류 (대기열이 빌 때까지 반복)
 uv run nr classify pending --limit 50

@@ -39,6 +39,7 @@
 | `derivation_groups` | 복사·전재된 글 묶음. 독립 근거를 셀 때 쓴다 |
 | `source_health` | 수집 상태 시계열. 관측 공백을 표시하는 데 쓴다 |
 | `discovered_urls` | 발견 공급자(GDELT 등)가 찾은 수집 후보. 정리한 URL이 유일하고, 찾은 탐색 루트·검색식·우선순위·상태(`new / fetched / skipped / blocked / failed`)를 둔다 (D25) |
+| `price_bars` | 종목 일봉(거래소 현지 날짜). `closes_at`(그 거래일이 끝난 시각)이 재생 시점보다 늦은 봉은 보여주지 않는다. 수정주가로 덮어쓴다 (D27) |
 | `fetch_logs` | 범용 수집기의 요청 결과 기록(`ok / blocked / transient / skipped / rejected`) (D25) |
 
 ### 분류·지식 그래프

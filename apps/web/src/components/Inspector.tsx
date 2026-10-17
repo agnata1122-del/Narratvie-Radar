@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { api, type Frames, type WikiSection } from '../api'
+import { api, type Frames, type PriceSeries, type WikiSection } from '../api'
 import { TYPE_GROUP } from '../lib/graphStyle'
 import {
   EDGE_STATUS_LABEL,
@@ -14,10 +14,12 @@ import {
   sourceName,
 } from '../lib/labels'
 import { Markdown } from '../lib/markdown'
+import { changeSince, changeTone, formatChange, formatPrice, sparkPath, visibleBars } from '../lib/prices'
 import { formatTime } from '../lib/time'
 import { safeHref } from '../lib/url'
 import type { Selection } from './GraphView'
 import { LinkOutIcon } from './icons'
+import { MarketBadge } from './MarketStrip'
 import { Chip, Muted, Skeleton } from './ui'
 
 type Props = {
@@ -34,6 +36,9 @@ type Props = {
   onPivot?: (nodeId: string) => void
   pivoting?: boolean
   onOpenProfile?: (profileId: string) => void
+  /** 선택한 노드가 종목이면 그 일봉과 지금 보는 구간 (D27) */
+  price?: PriceSeries | null
+  range?: { start: string; end: string } | null
 }
 
 function notKnownYet(error: unknown): boolean {
@@ -196,6 +201,7 @@ function NodeInspector(props: Omit<Props, 'selection'> & { id: string }) {
             <Stat value={`${(node.share_7d * 100).toFixed(1)}%`}>수집 글 중 비중</Stat>
           </div>
         )}
+        {props.price && props.range && <PriceSection series={props.price} asOf={asOf} range={props.range} />}
         {narrative && (
           <div className="space-y-2 rounded-xl bg-nr-surface-2 p-3 ring-1 ring-nr-border ring-inset">
             <div className="flex items-center gap-1.5 text-[11px] text-nr-muted">
@@ -331,5 +337,35 @@ export default function Inspector(props: Props) {
     <NodeInspector key={selection.id} id={selection.id} {...props} />
   ) : (
     <EdgeInspector key={selection.id} id={selection.id} {...props} />
+  )
+}
+
+/** 종목 노드의 일봉 종가. 재생 시점까지 끝난 날만 그린다 (D27) */
+function PriceSection({ series, asOf, range }: { series: PriceSeries; asOf: string; range: { start: string; end: string } }) {
+  const bars = visibleBars(series.bars, asOf)
+  if (bars.length === 0) {
+    return <Muted>이 시점까지 끝난 거래일의 시세가 없다.</Muted>
+  }
+  const pct = changeSince(bars, range.start)
+  const tone = changeTone(pct)
+  const last = bars[bars.length - 1]
+  const toneClass = tone === 'up' ? 'text-nr-up' : tone === 'down' ? 'text-nr-down' : 'text-nr-muted'
+  return (
+    <div className="space-y-1.5 rounded-xl bg-nr-surface-2 p-3 ring-1 ring-nr-border ring-inset">
+      <div className="flex items-center gap-1.5 text-[11px] text-nr-muted">
+        <MarketBadge market={series.market} />
+        일봉 종가
+        <span className="ml-auto tabular-nums">{last[0]} 마감</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-base font-semibold text-nr-text tabular-nums">{formatPrice(last[1], series.currency, series.market)}</span>
+        <span className={`text-xs font-semibold tabular-nums ${toneClass}`}>{formatChange(pct)}</span>
+        <span className="text-[11px] text-nr-muted">구간 시작 대비</span>
+      </div>
+      <svg viewBox="0 0 320 56" preserveAspectRatio="none" className={`h-14 w-full ${toneClass}`} aria-hidden="true">
+        <path d={sparkPath(bars, range.start, range.end, 320, 56, 4)} fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      </svg>
+      <p className="text-[10px] leading-4 text-nr-muted">토스증권 웹 시세 · 장이 끝난 날만 반영 · 투자 조언이 아니다</p>
+    </div>
   )
 }

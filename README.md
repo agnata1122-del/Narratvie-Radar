@@ -57,6 +57,7 @@ uv run nr discover gdelt                    # 주제(노드)로 GDELT 검색 →
 uv run nr sites list                        # 사이트별 허용 상태 (새 사이트는 검토 대기)
 uv run nr sites allow <사이트> --reason ... # 사이트 허용
 uv run nr collect web                       # 허용된 사이트에서 본문 가져오기 (사이트 단위 차단기)
+uv run nr collect prices                    # 트리 속 미국·한국 종목 일봉 (가격 렌즈)
 uv run nr emergency stop --reason ...       # 모든 발견·수집 긴급 중단
 uv run nr classify pending                  # 분류할 글 내보내기 (세션이 분류)
 uv run nr classify ingest <out.jsonl> --model <이름>   # 분류 결과 검증·저장

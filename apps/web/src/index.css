@@ -30,6 +30,9 @@
   --nr-series-entity: #2a78d6;
   --nr-series-concept: #eb6834;
   --nr-series-narrative: #1baf7a;
+  /* 시세 오르내림: 국내 관례대로 상승 빨강, 하락 파랑 (D27) */
+  --nr-up: #d63a3a;
+  --nr-down: #2563c9;
   --nr-node-dormant: #c3c8cf;
   --nr-edge-confirmed: #4a5361;
   --nr-edge-candidate: #7b8494;
@@ -68,6 +71,8 @@
     --nr-series-entity: #3987e5;
     --nr-series-concept: #d95926;
     --nr-series-narrative: #199e70;
+    --nr-up: #f06a6a;
+    --nr-down: #6a9cf0;
     --nr-node-dormant: #3b424d;
     --nr-edge-confirmed: #aab2bf;
     --nr-edge-candidate: #737c8a;
@@ -99,6 +104,8 @@
   --nr-series-entity: #3987e5;
   --nr-series-concept: #d95926;
   --nr-series-narrative: #199e70;
+  --nr-up: #f06a6a;
+  --nr-down: #6a9cf0;
   --nr-node-dormant: #3b424d;
   --nr-edge-confirmed: #aab2bf;
   --nr-edge-candidate: #737c8a;
@@ -145,6 +152,8 @@
   --color-nr-entity: var(--nr-series-entity);
   --color-nr-concept: var(--nr-series-concept);
   --color-nr-narrative: var(--nr-series-narrative);
+  --color-nr-up: var(--nr-up);
+  --color-nr-down: var(--nr-down);
   --color-nr-dormant: var(--nr-node-dormant);
   --color-nr-support: var(--nr-support);
   --color-nr-contradict: var(--nr-contradict);

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import type { PriceBarRow } from '../api'
 import { frames } from '../test/fixtures'
 import { binEvents, frameIndexAt, nodeIdsByLabel, positionIn } from './frames'
 import { edgeStyle, nodeStyle, type Palette } from './graphStyle'
 import { computeLayout } from './layout'
 import { mixColor, parseColor, toCss } from './motion'
+import { changeSince, changeTone, formatChange, formatPrice, sparkPath, visibleBars } from './prices'
 import { defaultRange, relativeTime } from './time'
 import { safeHref } from './url'
 
@@ -105,3 +107,36 @@ describe('safeHref', () => {
     expect(safeHref('not a url')).toBeNull()
   })
 })
+
+describe('prices', () => {
+  const bars: PriceBarRow[] = [
+    ['2026-10-12', 100, '2026-10-13T04:00:00Z'],
+    ['2026-10-13', 104, '2026-10-14T04:00:00Z'],
+    ['2026-10-14', 110, '2026-10-15T04:00:00Z'],
+  ]
+
+  it('never shows a bar before its trading day ended', () => {
+    expect(visibleBars(bars, '2026-10-14T03:59:00Z').map((b) => b[0])).toEqual(['2026-10-12'])
+    expect(visibleBars(bars, '2026-10-15T04:00:00Z')).toHaveLength(3)
+  })
+
+  it('measures change from the last close before the range start', () => {
+    expect(changeSince(bars, '2026-10-14T00:00:00Z')).toBeCloseTo(10)
+    expect(changeSince(bars, '2026-01-01T00:00:00Z')).toBeCloseTo(10) // 기준이 없으면 첫 봉
+    expect(changeSince([], '2026-10-14T00:00:00Z')).toBeNull()
+    expect(formatChange(-3.21)).toBe('−3.2%')
+    expect(formatChange(null)).toBe('—')
+    expect(changeTone(0.01)).toBe('flat')
+  })
+
+  it('places every series on the same time axis', () => {
+    const d = sparkPath(bars, '2026-10-13T04:00:00Z', '2026-10-15T04:00:00Z', 100, 20, 0)
+    expect(d).toBe('M0.0,20.0 L50.0,12.0 L100.0,0.0')
+    // 구간 앞의 봉은 기준 하나만 왼쪽 끝에 남는다
+    const later = sparkPath(bars, '2026-10-14T12:00:00Z', '2026-10-15T04:00:00Z', 100, 20, 0)
+    expect(later).toBe('M0.0,20.0 L100.0,0.0')
+    expect(formatPrice(123456, 'KRW', 'KR')).toBe('123,456원')
+    expect(formatPrice(12.5, null, 'US')).toBe('12.50')
+  })
+})
+
