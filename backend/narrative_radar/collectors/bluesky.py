@@ -11,6 +11,7 @@
   이상한 것은 흔하므로 그 글만 건너뛰고 센다.
 """
 
+import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -91,7 +92,7 @@ class JetstreamHandler:
     last_time_us: int | None = None
 
     def __post_init__(self) -> None:
-        self._terms = [normalize_text(t) for t in self.terms if t.strip()]
+        self._terms = [term_pattern(t) for t in self.terms if t.strip()]
         if not self._terms:
             raise ValueError("at least one search term is required")
 
@@ -176,7 +177,16 @@ class JetstreamHandler:
 
     def _matches(self, text: str) -> bool:
         normalized = normalize_text(text)
-        return any(term in normalized for term in self._terms)
+        return any(term.search(normalized) for term in self._terms)
+
+
+def term_pattern(term: str) -> re.Pattern[str]:
+    """영문 검색어는 단어 단위로 맞춘다 (envidia·summicron 같은 단어 속 일치를 버린다).
+    $NVDA·#nvidia·NVIDIA가는 맞는다. 한글은 조사가 붙으므로(삼성전자가) 부분 일치로 둔다."""
+    normalized = normalize_text(term)
+    if normalized.isascii():
+        return re.compile(rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])")
+    return re.compile(re.escape(normalized))
 
 
 def _reply_refs(record: dict[str, Any]) -> tuple[str | None, str | None]:

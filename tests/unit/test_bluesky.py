@@ -331,3 +331,20 @@ def test_late_threshold_is_configurable_for_batch_runs():
     )
     [action] = h.handle(post_event("nvidia", at=NOW - timedelta(hours=3)))
     assert action.document.ingest_mode == IngestMode.LIVE
+
+
+def test_ascii_terms_match_whole_words_only():
+    h = JetstreamHandler(
+        AuthorHasher("s" * 32), FixedClock(NOW), terms=["NVIDIA", "NVDA", "Micron", "삼성전자"]
+    )
+    for text in (
+        "$NVDA calls",
+        "#nvidia earnings",
+        "Nvidia's margin",
+        "NVIDIA가 오른다",
+        "Micron-HBM",
+        "삼성전자가 올랐다",
+    ):
+        assert h._matches(text), text
+    for text in ("me da envidia", "#summicron35 lens", "nvdaaccess"):
+        assert not h._matches(text), text
