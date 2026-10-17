@@ -1,5 +1,7 @@
 # 6시간 주기 예약 작업 프롬프트
 
+> 쓰지 않음: 정기 수집은 GitHub Actions로 옮겼다(DECISIONS D32). Claude 세션으로 다시 돌릴 때만 참고한다.
+
 claude.ai 예약 작업 화면에서 새 예약 작업을 만들 때 아래 "프롬프트" 블록을 그대로 붙여 넣는다.
 만들 때 저장소는 `agnata1122-del/narratvie-radar`와 `agnata1122-del/narratvie-radar-data`를 **둘 다** 고른다.
 Claude가 도구로 만든 예약 작업은 새 세션에 저장소를 붙이지 못해 0단계에서 멈춘다([OPERATIONS.md](OPERATIONS.md)).
