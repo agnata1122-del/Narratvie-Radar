@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 import sqlalchemy as sa
 
-from narrative_radar.classifiers.session import ingest_records
+from narrative_radar.classifiers.session import PROMPT_VERSION, ingest_records
 from narrative_radar.db.models import Document, Edge, InterestProfile, Node, ProfileNode
 from narrative_radar.db.seed import seed_defaults
 from narrative_radar.discovery.expansion import expand_profile
@@ -70,7 +70,7 @@ class GraphKit:
         )
         return self.session.get(Document, r.document_id)
 
-    def classify(self, doc, entities, claims=(), **kw):
+    def classify(self, doc, entities, claims=(), prompt_version=PROMPT_VERSION, **kw):
         output = {
             "relevance": 0.9,
             "is_noise": False,
@@ -94,7 +94,9 @@ class GraphKit:
         line = json.dumps(
             {"document_id": doc.document_id, "content_hash": doc.content_hash, "output": output}
         )
-        report = ingest_records(self.session, self.clock, [line], "test-model", self.cls_run)
+        report = ingest_records(
+            self.session, self.clock, [line], "test-model", self.cls_run, prompt_version
+        )
         assert not report.errors, report.errors
 
     def build(self):

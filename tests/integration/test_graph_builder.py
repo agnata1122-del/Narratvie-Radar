@@ -8,7 +8,7 @@ from datetime import timedelta
 import sqlalchemy as sa
 from graphkit import FILLER, HBM, NV, NV_KO, POWER, SKH, affects
 
-from narrative_radar.classifiers.session import run_baseline
+from narrative_radar.classifiers.session import prompt_version_for, run_baseline
 from narrative_radar.db.models import (
     Document,
     GraphEvent,
@@ -18,6 +18,7 @@ from narrative_radar.db.models import (
     Node,
 )
 from narrative_radar.discovery.expansion import shortest_depths
+from narrative_radar.domains.registry import get_pack
 from narrative_radar.graph.builder import independent_evidence
 from narrative_radar.ingest.runs import start_run
 from narrative_radar.schemas.enums import (
@@ -188,6 +189,15 @@ def test_session_classification_is_preferred_over_baseline(g, session, clock):
     g.classify(d, [NV, HBM])
     g.build()
     assert g.node("TECH:hbm") is not None  # 기준선은 새 개체를 만들지 않는다
+
+
+def test_session_classification_with_domain_pack_is_applied(g, session, clock):
+    # ingest는 도메인 팩 버전을 붙여 기록한다 (classification.v2+finance.v1)
+    d = g.doc(f"NVIDIA and HBM {FILLER}")
+    run_baseline(session, clock, start_run(session, clock, RunKind.CLASSIFY).run_id, "US:NVDA", 10)
+    g.classify(d, [NV, HBM], prompt_version=prompt_version_for(get_pack("finance")))
+    g.build()
+    assert g.node("TECH:hbm") is not None
 
 
 def test_available_at_is_processing_time(g, session, clock):

@@ -58,7 +58,15 @@ MAX_COMENTION_NODES = 12
 DERIVATION_WINDOW = timedelta(days=7)
 NARRATIVE_SIMILARITY = 0.85
 # 분류기를 고르는 순서: 세션 분류가 있으면 그것을, 없으면 규칙 기반 기준선을 쓴다.
+# 세션 분류는 도메인 팩 버전을 붙여 기록하므로(`classification.v2+finance.v1`) 접두어로 찾는다.
 CLASSIFIER_PREFERENCE = (PROMPT_VERSION, rule_based.MODEL_LABEL)
+
+
+def _version_filter(version: str) -> sa.ColumnElement[bool]:
+    column = ClassificationRun.prompt_version
+    if version == PROMPT_VERSION:
+        return sa.or_(column == version, column.startswith(f"{version}+", autoescape=True))
+    return column == version
 
 
 @dataclass
@@ -128,7 +136,7 @@ class GraphBuilder:
                 .where(
                     ClassificationRun.document_id == doc.document_id,
                     ClassificationRun.content_hash == doc.content_hash,
-                    ClassificationRun.prompt_version == version,
+                    _version_filter(version),
                     ClassificationRun.status == ClassificationStatus.ACCEPTED,
                 )
                 .order_by(ClassificationRun.completed_at.desc())
