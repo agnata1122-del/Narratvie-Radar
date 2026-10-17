@@ -5,6 +5,7 @@ import typer
 from narrative_radar import __version__
 from narrative_radar.cli_classify import classify_app
 from narrative_radar.cli_collect import collect_app
+from narrative_radar.cli_data import data_app
 from narrative_radar.cli_discover import discover_app, emergency_app
 from narrative_radar.cli_graph import graph_app
 from narrative_radar.cli_sites import sites_app
@@ -19,6 +20,7 @@ app.add_typer(db_app, name="db")
 app.add_typer(schemas_app, name="schemas")
 app.add_typer(sources_app, name="sources")
 app.add_typer(collect_app, name="collect")
+app.add_typer(data_app, name="data")
 app.add_typer(discover_app, name="discover")
 app.add_typer(emergency_app, name="emergency")
 app.add_typer(sites_app, name="sites")

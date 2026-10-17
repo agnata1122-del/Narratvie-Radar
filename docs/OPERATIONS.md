@@ -6,7 +6,7 @@
 
 1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 시세(D27)를 받으려면 `wts-info-api.tossinvest.com`도 추가한다. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
 2. **비밀값**: 같은 설정의 환경변수에 `NR_LIVE_COLLECTION_ENABLED=true`, `NR_AUTHOR_HASH_SALT=<무작위 64자>` 추가. salt는 한 번 정하면 바꾸지 않는다.
-3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소(예: `Narratvie-Radar-data`)를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). 데이터 내보내기·복원 명령은 저장소가 준비되면 만든다.
+3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소 `agnata1122-del/narratvie-radar-data`를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). `nr data export`는 이 코드 저장소 안으로는 내보내지 않는다.
 
 ## 주기 설정 (권장값: 3시간마다)
 
@@ -23,7 +23,9 @@ NR_REVISIT_OFFSETS_MINUTES='[180, 360, 1440]'   # 지표 재방문: 3시간·6�
 ## 한 주기
 
 ```bash
-# 0. 데이터 복원 (보관 저장소 준비 후)
+# 0. 데이터 복원: 비공개 데이터 저장소를 받아 DB로 푼다 (해시·행 수 확인 후 마이그레이션)
+git clone https://github.com/agnata1122-del/narratvie-radar-data ../narratvie-radar-data
+uv run nr data import ../narratvie-radar-data/snapshot   # 처음이라 스냅숏이 없으면 `uv run nr db init`
 
 # 1. 수집
 uv run nr collect hackernews --max-cycles 1 --lookback-minutes 240
@@ -49,7 +51,9 @@ uv run nr wiki refresh
 uv run nr sources list
 uv run nr sources report --hours 6
 
-# 5. 데이터 저장 (보관 저장소 준비 후)
+# 5. 데이터 저장: 압축·분할한 스냅숏을 비공개 데이터 저장소에 올린다
+uv run nr data export ../narratvie-radar-data/snapshot
+git -C ../narratvie-radar-data add -A && git -C ../narratvie-radar-data commit -m "snapshot" && git -C ../narratvie-radar-data push
 ```
 
 사이트 검토: 이용 조건과 robots.txt를 확인한 뒤 `nr sites allow <사이트> --reason "..."`(하루 상한은 `--daily-limit`). 차단된 사이트는 `nr sites logs <사이트>`로 원인을 보고, 문제가 풀렸다고 판단되면 `nr sites reset` → `allow` 순서로 다시 켠다. 자동으로 다시 켜지지 않는다.
