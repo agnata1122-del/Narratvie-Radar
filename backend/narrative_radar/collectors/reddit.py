@@ -64,6 +64,12 @@ def plan_queries(
     return out
 
 
+def server_term(term: str) -> str:
+    """여러 단어로 된 검색어는 서버에서 시간 초과가 잦아 가장 긴 단어 하나로 묻는다.
+    전체 표현이 들어 있는지는 받은 뒤 단어 단위로 다시 확인한다."""
+    return max(term.split(), key=len) if " " in term.strip() else term
+
+
 class RedditArcticCollector:
     source_adapter_id = SOURCE_ADAPTER_ID
     parser_version = PARSER_VERSION
@@ -81,7 +87,6 @@ class RedditArcticCollector:
         self.clock = clock
         self.terms = list(terms)
         self.late_threshold = late_threshold
-        self._patterns = [term_pattern(t) for t in self.terms if t.strip()]
 
     def queries(self) -> list[Query]:
         return plan_queries(self.terms)
@@ -96,7 +101,7 @@ class RedditArcticCollector:
             "fields": POST_FIELDS if query.kind == "posts" else COMMENT_FIELDS,
         }
         if query.term:
-            params["title" if query.kind == "posts" else "body"] = query.term
+            params["title" if query.kind == "posts" else "body"] = server_term(query.term)
         response = self.client.get(API.format(kind=query.kind), params=params)
         try:
             body = response.json()
@@ -156,8 +161,10 @@ class RedditArcticCollector:
         except (KeyError, TypeError, ValueError) as e:
             self._parse_failed(f"unexpected item shape: {e!r}")
 
-        if query.term is not None and not self._mentions_term(f"{title}\n{text}"):
-            return None  # 서버 검색은 넓게 잡는다. 단어 단위로 다시 확인한다
+        if query.term is not None and not term_pattern(query.term).search(
+            normalize_text(f"{title}\n{text}")
+        ):
+            return None  # 서버 검색은 넓게 잡는다. 이 질의의 검색어로 다시 확인한다
 
         return DocumentIn(
             source_adapter_id=SOURCE_ADAPTER_ID,
@@ -178,10 +185,6 @@ class RedditArcticCollector:
             ),
             metrics=metrics,
         )
-
-    def _mentions_term(self, text: str) -> bool:
-        normalized = normalize_text(text)
-        return any(p.search(normalized) for p in self._patterns)
 
     def _parse_failed(self, reason: str) -> NoReturn:
         self.client.guard.trip(TripKind.ERROR, f"parse failed: {reason}")

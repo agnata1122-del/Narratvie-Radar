@@ -13,7 +13,12 @@ from narrative_radar.collectors.author import AuthorHasher
 from narrative_radar.collectors.guard import CollectionBlocked
 from narrative_radar.collectors.http import PoliteClient
 from narrative_radar.collectors.rate_limit import MinIntervalLimiter
-from narrative_radar.collectors.reddit import Query, RedditArcticCollector, plan_queries
+from narrative_radar.collectors.reddit import (
+    Query,
+    RedditArcticCollector,
+    plan_queries,
+    server_term,
+)
 from narrative_radar.core.clock import FixedClock
 from narrative_radar.schemas.enums import ContentAccessStatus, IngestMode
 
@@ -132,3 +137,16 @@ def test_error_response_stops_collection():
     c = RedditArcticCollector(client, AuthorHasher("s" * 32), FixedClock(NOW), ["NVDA"])
     with pytest.raises(CollectionBlocked):
         c.fetch(Query("posts", "NVDA_Stock", None), NOW - timedelta(days=1), NOW)
+
+
+def test_multi_word_terms_query_one_word_and_recheck_full_phrase():
+    assert server_term("Samsung Electronics") == "Electronics"
+    assert server_term("NVDA") == "NVDA"
+    seen: list = []
+    phone = {**COMMENT, "id": "c20", "body": "my Samsung phone died"}
+    stock = {**COMMENT, "id": "c21", "body": "Samsung Electronics guidance is out"}
+    c = make([phone, stock], seen)
+    q = Query("comments", "wallstreetbets", "Samsung Electronics")
+    docs = c.fetch(q, NOW - timedelta(days=60), NOW).documents
+    assert seen[0]["body"] == ["Electronics"]
+    assert [d.external_id for d in docs] == ["t1_c21"]
