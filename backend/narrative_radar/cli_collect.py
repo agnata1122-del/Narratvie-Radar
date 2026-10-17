@@ -141,7 +141,7 @@ def collect_hackernews_backfill(
 def collect_reddit(
     days: int = typer.Option(1, min=1, max=3650, help="처음 실행할 때 거슬러 올라갈 날 수"),
     max_requests: int = typer.Option(
-        200, min=1, help="질의 하나에 이번 실행에서 보낼 최대 요청 수. 넘으면 다음에 이어 받는다"
+        30, min=1, help="질의 하나에 이번 실행에서 보낼 최대 요청 수. 넘으면 다음에 이어 받는다"
     ),
 ) -> None:
     """Reddit 투자 서브레딧의 글·댓글을 Arctic Shift 보관본에서 받는다 (D31)."""
@@ -150,7 +150,8 @@ def collect_reddit(
     from narrative_radar.collectors.guard import CollectionBlocked
     from narrative_radar.collectors.hackernews import minimal_terms
     from narrative_radar.collectors.http import PoliteClient
-    from narrative_radar.collectors.reddit import RedditArcticCollector
+    from narrative_radar.collectors.rate_limit import MinIntervalLimiter
+    from narrative_radar.collectors.reddit import REDDIT_MIN_INTERVAL_SECONDS, RedditArcticCollector
     from narrative_radar.ingest.runner import profile_terms, reddit_cycle
     from narrative_radar.schemas.enums import RunKind
 
@@ -162,9 +163,11 @@ def collect_reddit(
                 session, ctx.clock.now(), limit=ctx.settings.max_hn_terms, ascii_only=True
             )
         )
-    # Arctic Shift는 서버 시간 초과를 422로 알린다. 간격을 두고 두 번까지 다시 묻는다
+    # Arctic Shift는 서버 시간 초과를 422로 알린다. 간격을 두고 두 번까지 다시 묻는다.
+    # 3초 간격으로 15분쯤 받자 429로 막혔다(2026-10-17). 무료 공개 서비스라 10초로 늦춘다
     client = PoliteClient(
         ctx.settings.user_agent,
+        limiter=MinIntervalLimiter(REDDIT_MIN_INTERVAL_SECONDS),
         guard=ctx.guard(),
         transient_retries=2,
         transient_statuses=(422,),

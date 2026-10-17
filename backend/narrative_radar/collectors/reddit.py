@@ -26,6 +26,8 @@ SOURCE_ADAPTER_ID = "reddit_arctic"
 PARSER_VERSION = "reddit_arctic.v1"
 API = "https://arctic-shift.photon-reddit.com/api/{kind}/search"
 PAGE_SIZE = 100
+# 요청 간격. 3초로는 15분쯤 뒤 429로 막혔다 (2026-10-17)
+REDDIT_MIN_INTERVAL_SECONDS = 10.0
 
 # 전부 받는 서브레딧과 검색어로만 받는 서브레딧
 FULL_SUBREDDITS = ("NVDA_Stock",)
