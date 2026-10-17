@@ -1,12 +1,16 @@
 """분류 출력 (PRD 6.3). 이 출력은 바로 반영되지 않고 앱이 검증한 뒤 반영한다 (PRD 4.1).
 
-분류는 Claude Code 세션이 지침(classifiers/guidelines/classification_v1.md)에 따라 하거나,
-규칙 기반 기준 분류기가 한다 (DECISIONS D16).
+분류는 Claude Code 세션이 지침(classifiers/guidelines/classification_v2.md + 도메인 팩 보충)에 따라
+하거나, 규칙 기반 기준 분류기가 한다 (DECISIONS D16, D22).
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from enum import StrEnum
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from narrative_radar.schemas.enums import (
+    LEGACY_VALUES,
     EdgeType,
     EvidenceStatus,
     NarrativeRole,
@@ -15,7 +19,22 @@ from narrative_radar.schemas.enums import (
     Stance,
 )
 
-SCHEMA_VERSION = "classification.v1"
+# v2: 노드 유형·태도·방향을 분야와 무관한 값으로 바꿨다 (DECISIONS D22)
+SCHEMA_VERSION = "classification.v2"
+
+
+def _legacy(enum_cls: type[StrEnum]) -> BeforeValidator:
+    """예전 값(company, bullish …)을 지금 값으로 읽는다.
+
+    저장된 v1 분류 결과를 다시 반영할 때 필요하다.
+    """
+    mapping = LEGACY_VALUES[enum_cls]
+    return BeforeValidator(lambda v: mapping.get(v, v) if isinstance(v, str) else v)
+
+
+NodeTypeField = Annotated[NodeType, _legacy(NodeType)]
+StanceField = Annotated[Stance, _legacy(Stance)]
+PolarityField = Annotated[Polarity, _legacy(Polarity)]
 
 # 글 하나에서 뽑는 양의 상한. 넘으면 분류가 과도하다고 보고 검증에서 거부한다.
 MAX_ENTITIES = 20
@@ -26,7 +45,7 @@ class EntityMention(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=200, description="원문에 나온 표기")
-    type: NodeType
+    type: NodeTypeField
     canonical_key: str | None = Field(
         default=None,
         max_length=200,
@@ -40,8 +59,8 @@ class ClaimExtract(BaseModel):
     subject: str = Field(min_length=1, max_length=200, description="entities의 name 중 하나")
     predicate: EdgeType
     object: str = Field(min_length=1, max_length=200, description="entities의 name 중 하나")
-    polarity: Polarity
-    stance: Stance
+    polarity: PolarityField
+    stance: StanceField
     evidence_status: EvidenceStatus
     excerpt: str = Field(min_length=1, max_length=200, description="주장이 드러난 원문 그대로")
     narrative_key: str | None = Field(
@@ -66,7 +85,7 @@ class ClassificationOutput(BaseModel):
     is_noise: bool = Field(description="잡담·광고·밈처럼 분석할 내용이 없으면 true")
     language: str | None = Field(default=None, max_length=8, description="ISO 639-1")
     entities: list[EntityMention] = Field(max_length=MAX_ENTITIES)
-    stance: Stance
+    stance: StanceField
     claims: list[ClaimExtract] = Field(max_length=MAX_CLAIMS)
     needs_review: bool = Field(description="판단이 불확실하면 true. 억지로 분류하지 않는다")
     review_reason: str | None = Field(default=None, max_length=300)

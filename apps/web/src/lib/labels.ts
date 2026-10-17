@@ -1,17 +1,22 @@
 // 화면 문구. 백엔드 위키(wiki/build.py)와 같은 표현을 쓴다.
 
 export const NODE_TYPE_LABEL: Record<string, string> = {
-  company: '기업',
-  industry: '산업',
+  organization: '조직',
+  person: '인물',
+  product: '제품·작품',
   technology: '기술',
-  topic: '이슈',
+  topic: '주제',
   event: '사건',
+  place: '장소',
   narrative: '내러티브',
+  // 예전 값 (마이그레이션 0008 이전 데이터)
+  company: '조직',
+  industry: '주제',
 }
 
 export const SERIES_LABEL: Record<string, string> = {
-  entity: '기업·산업',
-  concept: '기술·이슈·사건',
+  entity: '조직·인물',
+  concept: '제품·기술·주제',
   narrative: '내러티브',
 }
 

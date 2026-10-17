@@ -15,6 +15,8 @@ class SourceDefinition:
     kind: SourceKind
     display_name: str
     base_url: str
+    # 이 소스가 맞는 도메인 팩. 비어 있으면 어느 분야에서나 쓰는 공통 소스다 (DECISIONS D22)
+    domains: tuple[str, ...] = ()
 
 
 DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
@@ -40,6 +42,7 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         kind=SourceKind.COMMUNITY,
         display_name="미주갤",
         base_url="https://gall.dcinside.com",
+        domains=("finance",),
     ),
     SourceDefinition(
         id="naver_world_nvda",
@@ -47,5 +50,6 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         kind=SourceKind.COMMUNITY,
         display_name="네이버 해외주식 토론",
         base_url="https://m.stock.naver.com",
+        domains=("finance",),
     ),
 )

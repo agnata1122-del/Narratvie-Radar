@@ -22,7 +22,7 @@
 
 | 테이블 | 역할 |
 |---|---|
-| `interest_profiles` | 관심사와 자동 탐색 설정 (root, depth, 일일 신규 노드 예산, 최소 독립 근거 수) |
+| `interest_profiles` | 관심사와 자동 탐색 설정 (root, depth, 일일 신규 노드 예산, 최소 독립 근거 수, 도메인 팩 `domain`) |
 | `source_adapters` | 소스별 상태(`not_authorized / test_mode / live / paused / blocked / stopped`)와 `live_enabled` |
 | `pipeline_runs` | 수집·분석 실행 단위. mode(`live / retrospective`), model·prompt·schema·code 버전 |
 
@@ -79,3 +79,11 @@ uv run alembic revision --autogenerate -m "..."   # 모델을 바꾼 뒤
 ```
 
 SQLite라서 Alembic은 batch 모드로 동작한다. 테스트(`tests/integration/test_db_schema.py`)가 마이그레이션 결과와 모델이 일치하는지 확인한다.
+
+## 노드 유형과 키 (DECISIONS D22)
+
+노드 유형은 분야와 무관하다: `organization`(조직), `person`(공인), `product`(제품·작품), `technology`, `topic`(주제·산업·이슈), `event`, `place`, `narrative`.
+키는 공통 형식 `ORG:` `PERSON:` `PRODUCT:` `TECH:` `TOPIC:` `EVENT:` `PLACE:` `NARRATIVE:` + 소문자 슬러그이고, 도메인 팩이 형식을 더할 수 있다(금융 팩: 상장사 `US:NVDA`, 산업 `INDUSTRY:슬러그`).
+주장의 태도(`stance`)는 `positive/negative/neutral/mixed`, 방향(`polarity`)은 `enabler/constraint/neutral`이다.
+마이그레이션 0008 이전 값(company, industry, bullish, bearish, growth_driver)은 DB에서 바꿨고, 추가 전용 테이블에 남은 분류 결과는 읽을 때 바꾼다.
+

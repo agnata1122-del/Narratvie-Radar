@@ -1,38 +1,16 @@
 """분류할 때 함께 넘기는 현재 온톨로지와 키 규칙."""
 
-import re
 from dataclasses import asdict, dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from narrative_radar.db.models import Narrative, Node, NodeAlias
+from narrative_radar.domains import DomainPack, valid_key
 from narrative_radar.schemas.enums import NodeStatus, NodeType
 
-# canonical_key 형식. 기업은 국가:티커, 나머지는 유형:영문 슬러그.
-KEY_PATTERNS: dict[NodeType, re.Pattern[str]] = {
-    NodeType.COMPANY: re.compile(
-        r"^(?:[A-Z]{2}:[A-Z0-9.\-]{1,12}|COMPANY:[a-z0-9]+(?:-[a-z0-9]+)*)$"
-    ),
-    NodeType.INDUSTRY: re.compile(r"^INDUSTRY:[a-z0-9]+(?:-[a-z0-9]+)*$"),
-    NodeType.TECHNOLOGY: re.compile(r"^TECH:[a-z0-9]+(?:-[a-z0-9]+)*$"),
-    NodeType.TOPIC: re.compile(r"^TOPIC:[a-z0-9]+(?:-[a-z0-9]+)*$"),
-    NodeType.EVENT: re.compile(r"^EVENT:[a-z0-9]+(?:-[a-z0-9]+)*$"),
-    NodeType.NARRATIVE: re.compile(r"^NARRATIVE:[a-z0-9]+(?:-[a-z0-9]+)*$"),
-}
-
-KEY_EXAMPLES: dict[NodeType, str] = {
-    NodeType.COMPANY: "US:NVDA, KR:000660, COMPANY:openai (티커가 없을 때)",
-    NodeType.INDUSTRY: "INDUSTRY:semiconductors",
-    NodeType.TECHNOLOGY: "TECH:hbm",
-    NodeType.TOPIC: "TOPIC:data-center-power",
-    NodeType.EVENT: "EVENT:q3-2026-earnings",
-    NodeType.NARRATIVE: "NARRATIVE:power-is-the-bottleneck (앱이 만든다)",
-}
-
-
-def valid_key(node_type: NodeType, key: str) -> bool:
-    return bool(KEY_PATTERNS[node_type].match(key))
+# 키 규칙은 도메인 팩이 정한다 (공통 규칙 + 팩 규칙, DECISIONS D22)
+__all__ = ["Ontology", "load_ontology", "valid_key"]
 
 
 @dataclass(frozen=True)
@@ -55,11 +33,11 @@ class Ontology:
     nodes: list[OntologyNode]
     narratives: list[OntologyNarrative]
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self, pack: DomainPack) -> dict[str, object]:
         return {
             "nodes": [asdict(n) for n in self.nodes],
             "narratives": [asdict(n) for n in self.narratives],
-            "key_rules": {t.value: KEY_EXAMPLES[t] for t in NodeType},
+            "key_rules": pack.key_rules(),
         }
 
 

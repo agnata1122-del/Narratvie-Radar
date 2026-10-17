@@ -44,6 +44,7 @@ class RootInterest:
     label: str
     node_type: NodeType
     aliases: tuple[str, ...]
+    domain: str = "general"
 
 
 # 은어는 실제 데이터에서 확인하며 추가한다 (DECISIONS D4). 여기에는 확실한 표기만 둔다.
@@ -51,8 +52,9 @@ DEFAULT_ROOT = RootInterest(
     profile_name="NVIDIA Research",
     canonical_key="US:NVDA",
     label="NVIDIA",
-    node_type=NodeType.COMPANY,
+    node_type=NodeType.ORGANIZATION,
     aliases=("NVIDIA", "NVDA", "엔비디아", "NVIDIA Corporation"),
+    domain="finance",  # 첫 관심사는 금융 팩의 첫 사례다 (DECISIONS D22)
 )
 
 
@@ -78,6 +80,7 @@ def seed_defaults(session: Session, clock: Clock, root: RootInterest = DEFAULT_R
     profile = InterestProfile(
         profile_id=new_id("prf", now),
         name=root.profile_name,
+        domain=root.domain,
         root_canonical_key=root.canonical_key,
         created_at=now,
         updated_at=now,

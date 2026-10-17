@@ -22,10 +22,10 @@ from narrative_radar.schemas.enums import EdgeType, RunKind
 T0 = datetime(2026, 10, 16, 3, 0, tzinfo=UTC)
 FILLER = "this example sentence has enough words for the copy detector to work"
 
-NV = ("NVIDIA", "company", "US:NVDA")
-NV_KO = ("엔비디아", "company", None)
+NV = ("NVIDIA", "organization", "US:NVDA")
+NV_KO = ("엔비디아", "organization", None)
 HBM = ("HBM", "technology", "TECH:hbm")
-SKH = ("SK hynix", "company", "KR:000660")
+SKH = ("SK hynix", "organization", "KR:000660")
 POWER = ("data center power", "topic", "TOPIC:data-center-power")
 
 

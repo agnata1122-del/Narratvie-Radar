@@ -35,6 +35,7 @@ def test_overview(api):
     body = client.get("/api/overview").json()
     assert body["profile"]["root_key"] == "US:NVDA"
     assert body["profile"]["max_depth"] == 2
+    assert body["profile"]["domain"]["id"] == "finance"  # 첫 관심사는 금융 팩
     assert body["counts"]["documents"] == 4
     assert {s["id"] for s in body["sources"]} >= {"hackernews", "bluesky_jetstream"}
 

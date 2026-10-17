@@ -35,7 +35,7 @@ def test_aliases_resolve_to_the_same_node(g, session):
     d1 = g.doc(f"엔비디아 {FILLER}")
     g.classify(d1, [NV_KO])
     d2 = g.doc(f"NVDA {FILLER} two")
-    g.classify(d2, [("NVDA", "company", None)])
+    g.classify(d2, [("NVDA", "organization", None)])
     g.build()
     assert session.scalar(sa.select(sa.func.count()).select_from(Node)) == 1
 
@@ -137,7 +137,7 @@ def test_narratives_are_created_reused_and_linked(g, session):
 def test_expansion_respects_depth(g, session):
     g.confirm(HBM, NV)  # depth 1
     g.confirm(SKH, HBM)  # depth 2
-    far = ("Far Co", "company", "COMPANY:far-co")
+    far = ("Far Co", "organization", "COMPANY:far-co")
     g.confirm(far, SKH)  # depth 3
     g.build()
     assert g.decision("TECH:hbm") == ProfileNodeStatus.ADMITTED

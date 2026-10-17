@@ -29,7 +29,7 @@ describe('layout', () => {
 })
 
 describe('graph style', () => {
-  const base = { type: 'company', isRoot: false }
+  const base = { type: 'organization', isRoot: false }
   it('grows with activity and greys out dormant nodes', () => {
     const quiet = nodeStyle({ ...base, value: [0, 'active', 'admitted', 0] }, palette)
     const busy = nodeStyle({ ...base, value: [4, 'active', 'admitted', 9] }, palette)
@@ -39,8 +39,9 @@ describe('graph style', () => {
   it('fades nodes waiting for review and draws narratives as diamonds', () => {
     expect(nodeStyle({ ...base, value: [1, 'active', 'pending_review', 1] }, palette).color).toBe('rgba(42, 120, 214, 0.42)')
     expect(nodeStyle({ type: 'narrative', isRoot: false, value: [1, 'active', 'admitted', 1] }, palette).shape).toBe('diamond')
-    // 유형 6종은 3색 묶음으로 간다 (모든 쌍 색각 검사)
-    expect(nodeStyle({ type: 'industry', isRoot: false, value: [1, 'active', 'admitted', 1] }, palette).color).toBe('rgba(42, 120, 214, 1)')
+    // 유형 8종은 3색 묶음으로 간다 (모든 쌍 색각 검사). 인물은 조직과 같은 행위자 묶음
+    expect(nodeStyle({ type: 'person', isRoot: false, value: [1, 'active', 'admitted', 1] }, palette).color).toBe('rgba(42, 120, 214, 1)')
+    expect(nodeStyle({ type: 'place', isRoot: false, value: [1, 'active', 'admitted', 1] }, palette).color).toBe('rgba(235, 104, 52, 1)')
   })
   it('draws confirmed relations solid and thicker, candidates dashed', () => {
     const confirmed = edgeStyle({ relation: 'SUPPLIES_TO', value: [2, 'confirmed', 2], highlighted: false }, palette)

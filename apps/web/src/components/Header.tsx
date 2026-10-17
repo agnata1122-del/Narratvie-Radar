@@ -78,6 +78,11 @@ export default function Header({ overview, health, healthPending, healthError, t
         <span className="text-nr-muted">관심사</span>
         <span className="rounded-md bg-nr-text px-2 py-0.5 text-[12px] font-semibold text-nr-surface">{p?.root_label ?? p?.name ?? '—'}</span>
         {p && (
+          <span className="rounded-md bg-nr-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-nr-text-2 ring-1 ring-nr-border ring-inset" title="도메인 팩: 키 규칙·분류 지침·소스를 정한다">
+            {p.domain.name}
+          </span>
+        )}
+        {p && (
           <span className="text-nr-text-2">
             Depth {p.max_depth} · 자동 확장 {p.auto_expand ? 'ON' : 'OFF'}
           </span>

@@ -32,8 +32,8 @@ uv run nr collect bluesky-metrics
 
 # 2. 분류 (대기열이 빌 때까지 반복)
 uv run nr classify pending --limit 50
-#    → 세션이 backend/narrative_radar/classifiers/guidelines/classification_v1.md에 따라
-#      data/work/classify/out.jsonl을 쓴다
+#    → 세션이 context.json의 guidelines 목록(공통 classification_v2.md + 도메인 팩 보충)에 따라
+#      data/work/classify/out.jsonl을 쓴다. 관심사들이 다른 팩을 쓰면 --domain으로 고른다
 uv run nr classify ingest data/work/classify/out.jsonl --model <세션 모델 이름>
 
 # 3. 그래프·위키 갱신

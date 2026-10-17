@@ -89,6 +89,8 @@ class InterestProfile(Base):
 
     profile_id: Mapped[str] = mapped_column(ID, primary_key=True)
     name: Mapped[str] = mapped_column(sa.String(200))
+    # 도메인 팩 ID (domains/registry.py). 키 규칙·분류 지침 보충·소스·렌즈를 정한다 (DECISIONS D22)
+    domain: Mapped[str] = mapped_column(sa.String(32), server_default="general")
     root_canonical_key: Mapped[str] = mapped_column(sa.String(200))
     max_depth: Mapped[int] = mapped_column(default=2)
     auto_expand: Mapped[bool] = mapped_column(default=True)

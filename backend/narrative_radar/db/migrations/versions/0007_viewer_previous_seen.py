@@ -27,5 +27,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("viewers") as batch:
-        batch.drop_column("previous_seen_at")
+    # batch 재생성은 이 테이블을 참조하는 외래 키 때문에 실패한다.
+    # SQLite 3.35+의 DROP COLUMN을 쓴다.
+    op.execute(sa.text("ALTER TABLE viewers DROP COLUMN previous_seen_at"))

@@ -18,6 +18,7 @@ export type Overview = {
   profile: {
     profile_id: string
     name: string
+    domain: { id: string; name: string; lenses: string[] }
     root_key: string
     root_label: string
     root_node_id: string | null

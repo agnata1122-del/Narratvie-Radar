@@ -44,6 +44,16 @@ RELATION_KO = {
     "CLAIMED_CAUSE_OF": "원인이라는 주장",
     "CO_MENTIONED_WITH": "함께 언급",
 }
+TYPE_KO = {
+    "organization": "조직",
+    "person": "인물",
+    "product": "제품·작품",
+    "technology": "기술",
+    "topic": "주제",
+    "event": "사건",
+    "place": "장소",
+    "narrative": "내러티브",
+}
 STATUS_KO = {"candidate": "발견 후보", "confirmed": "관측 확정", "weakened": "약해짐"}
 STATE_KO = {
     "emerging": "새로 등장",
@@ -116,7 +126,7 @@ def build_sections(session: Session, state: GraphState, node_id: str) -> list[Se
         "휴면" if me.dormant else {"active": "활성", "candidate": "후보"}.get(me.status, me.status)
     )
     overview = [
-        f"**{me.label}** · {me.node_type} · 상태: {status}",
+        f"**{me.label}** · {TYPE_KO.get(me.node_type, me.node_type)} · 상태: {status}",
         f"처음 관측: {_fmt(me.first_seen)} · "
         f"최근 7일 언급 {me.mentions_7d}건 (독립 {me.independent_7d})",
     ]

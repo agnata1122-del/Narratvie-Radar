@@ -239,20 +239,24 @@
       "type": "string"
     },
     "NodeType": {
+      "description": "어느 분야에서나 쓰는 노드 유형 (DECISIONS D22).\n\n분야별 구분은 도메인 팩의 키 규칙이 맡는다.",
       "enum": [
-        "company",
-        "industry",
+        "organization",
+        "person",
+        "product",
         "technology",
         "topic",
         "event",
+        "place",
         "narrative"
       ],
       "title": "NodeType",
       "type": "string"
     },
     "Polarity": {
+      "description": "주어가 대상에 힘을 보태는가(enabler), 막는가(constraint).",
       "enum": [
-        "growth_driver",
+        "enabler",
         "constraint",
         "neutral"
       ],
@@ -260,9 +264,10 @@
       "type": "string"
     },
     "Stance": {
+      "description": "글쓴이가 주어(대상)를 어떻게 보는가. 금융 팩에서는 긍정=강세, 부정=약세로 읽는다.",
       "enum": [
-        "bullish",
-        "bearish",
+        "positive",
+        "negative",
         "neutral",
         "mixed"
       ],

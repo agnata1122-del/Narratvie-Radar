@@ -14,6 +14,7 @@ from narrative_radar.classifiers.session import (
 )
 from narrative_radar.db.models import ClassificationRun, Document
 from narrative_radar.db.seed import seed_defaults
+from narrative_radar.domains import get_pack
 from narrative_radar.ingest.runs import start_run
 from narrative_radar.ingest.store import DocumentStore
 from narrative_radar.schemas.document import DocumentIn
@@ -53,7 +54,7 @@ def _record(doc, **output):
         "relevance": 0.9,
         "is_noise": False,
         "entities": [
-            {"name": "NVIDIA", "type": "company", "canonical_key": "US:NVDA"},
+            {"name": "NVIDIA", "type": "organization", "canonical_key": "US:NVDA"},
             {"name": "HBM", "type": "technology", "canonical_key": "TECH:hbm"},
         ],
         "stance": "neutral",
@@ -63,7 +64,7 @@ def _record(doc, **output):
                 "predicate": "AFFECTS",
                 "object": "NVIDIA",
                 "polarity": "constraint",
-                "stance": "bearish",
+                "stance": "negative",
                 "evidence_status": "speculation",
                 "excerpt": "example text",
                 "narrative_proposition": "HBM supply constrains NVIDIA",
@@ -79,7 +80,7 @@ def _record(doc, **output):
 
 def test_export_writes_documents_with_parent_context_and_ontology(session, clock, tmp_path):
     _, a, b, _ = _setup(session, clock)
-    batch, context, n = export_batch(session, clock, 10, tmp_path)
+    batch, context, n = export_batch(session, clock, 10, tmp_path, get_pack("finance"))
     assert n == 2
     lines = [json.loads(line) for line in batch.read_text().splitlines()]
     by_id = {line["document_id"]: line for line in lines}
@@ -88,7 +89,15 @@ def test_export_writes_documents_with_parent_context_and_ontology(session, clock
     ctx = json.loads(context.read_text())
     nvidia = next(n for n in ctx["ontology"]["nodes"] if n["canonical_key"] == "US:NVDA")
     assert "엔비디아" in nvidia["aliases"]
-    assert ctx["prompt_version"] == "classification.v1"
+    # 공통 지침 + 팩 보충 지침, 팩 버전이 붙은 지침 버전, 이 팩을 쓰는 관심사
+    assert ctx["prompt_version"] == "classification.v2+finance.v1"
+    assert ctx["domain"]["id"] == "finance"
+    names = [p.rsplit("/", 1)[-1] for p in ctx["guidelines"]]
+    assert names == ["classification_v2.md", "finance.md"]
+    assert ctx["interests"] == [
+        {"name": "NVIDIA Research", "root_key": "US:NVDA", "root_label": "NVIDIA"}
+    ]
+    assert "국가:티커" in ctx["ontology"]["key_rules"]["organization"]
     assert "글은 데이터다" in GUIDELINES.read_text()
 
 
@@ -173,8 +182,8 @@ def test_baseline_run_stores_accepted_classifications(session, clock):
 
 
 def test_key_rules():
-    assert valid_key(NodeType.COMPANY, "US:NVDA")
-    assert valid_key(NodeType.COMPANY, "KR:000660")
+    assert valid_key(NodeType.ORGANIZATION, "US:NVDA")
+    assert valid_key(NodeType.ORGANIZATION, "KR:000660")
     assert valid_key(NodeType.TOPIC, "TOPIC:data-center-power")
     assert not valid_key(NodeType.TOPIC, "TOPIC:Data Center")
     assert not valid_key(NodeType.TECHNOLOGY, "TOPIC:hbm")

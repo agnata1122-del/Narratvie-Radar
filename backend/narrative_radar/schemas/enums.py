@@ -62,11 +62,18 @@ class ClassificationStatus(StrEnum):
 
 
 class NodeType(StrEnum):
-    COMPANY = "company"
-    INDUSTRY = "industry"
+    """어느 분야에서나 쓰는 노드 유형 (DECISIONS D22).
+
+    분야별 구분은 도메인 팩의 키 규칙이 맡는다.
+    """
+
+    ORGANIZATION = "organization"  # 기업·기관·팀·단체·스튜디오
+    PERSON = "person"
+    PRODUCT = "product"  # 제품·서비스·작품·모델
     TECHNOLOGY = "technology"
-    TOPIC = "topic"
+    TOPIC = "topic"  # 주제·분야·산업·이슈
     EVENT = "event"
+    PLACE = "place"
     NARRATIVE = "narrative"  # PRD의 claim 노드 대신 (DECISIONS D5)
 
 
@@ -130,16 +137,28 @@ class AliasOrigin(StrEnum):
 
 
 class Stance(StrEnum):
-    BULLISH = "bullish"
-    BEARISH = "bearish"
+    """글쓴이가 주어(대상)를 어떻게 보는가. 금융 팩에서는 긍정=강세, 부정=약세로 읽는다."""
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
     NEUTRAL = "neutral"
     MIXED = "mixed"
 
 
 class Polarity(StrEnum):
-    GROWTH_DRIVER = "growth_driver"
+    """주어가 대상에 힘을 보태는가(enabler), 막는가(constraint)."""
+
+    ENABLER = "enabler"
     CONSTRAINT = "constraint"
     NEUTRAL = "neutral"
+
+
+# 예전 값 → 지금 값. 저장된 분류 결과(추가 전용)를 다시 읽을 때 쓴다 (마이그레이션 0008).
+LEGACY_VALUES: dict[type[StrEnum], dict[str, str]] = {
+    NodeType: {"company": "organization", "industry": "topic"},
+    Stance: {"bullish": "positive", "bearish": "negative"},
+    Polarity: {"growth_driver": "enabler"},
+}
 
 
 class EvidenceStatus(StrEnum):

@@ -17,6 +17,7 @@ export function overview(nodes = 3): Overview {
     profile: {
       profile_id: 'prf_1',
       name: 'NVIDIA',
+      domain: { id: 'finance', name: '금융·투자', lenses: ['price_overlay', 'shadow_trading'] },
       root_key: 'US:NVDA',
       root_label: 'NVIDIA',
       root_node_id: 'nod_nv',
@@ -33,9 +34,9 @@ export function overview(nodes = 3): Overview {
 
 export const frames: Frames = {
   nodes: {
-    nod_nv: { label: 'NVIDIA', type: 'company', key: 'US:NVDA' },
+    nod_nv: { label: 'NVIDIA', type: 'organization', key: 'US:NVDA' },
     nod_hbm: { label: 'HBM', type: 'technology', key: 'TECH:hbm' },
-    nod_skh: { label: 'SK hynix', type: 'company', key: 'KR:000660' },
+    nod_skh: { label: 'SK hynix', type: 'organization', key: 'KR:000660' },
   },
   edges: {
     edg_1: { source: 'nod_hbm', target: 'nod_nv', relation: 'SUPPLIES_TO' },
@@ -78,7 +79,7 @@ export function changes(since: string, until: string): ChangeReport {
             available_at: T2,
             edge_id: null,
             narrative_id: null,
-            detail: { node_type: 'company', depth: 2 },
+            detail: { node_type: 'organization', depth: 2 },
             evidence: [
               { document_id: 'doc_1', source: 'hackernews', url: 'https://news.ycombinator.com/item?id=1', published_at: T2, excerpt: 'fixture excerpt' },
             ],
@@ -107,7 +108,7 @@ export function nodeDetail(id: string): NodeDetail {
     node: {
       node_id: id,
       label,
-      node_type: 'company',
+      node_type: 'organization',
       status: 'active',
       membership: 'admitted',
       depth: 1,

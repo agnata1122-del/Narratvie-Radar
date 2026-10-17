@@ -1,7 +1,8 @@
 """세션 분류 흐름 (DECISIONS D16).
 
 1. export_batch: 분류할 글과 온톨로지를 파일로 내보낸다.
-2. Claude Code 세션이 guidelines/classification_v1.md에 따라 ClassificationRecord JSONL을 쓴다.
+2. Claude Code 세션이 guidelines/classification_v2.md(+ 도메인 팩 보충)에 따라
+   ClassificationRecord JSONL을 쓴다.
 3. ingest_records: 스키마와 구조 규칙을 검증해 classification_runs에 저장한다.
    그래프 반영(M5)은 이 기록을 다시 검증한 뒤에 한다.
 """
@@ -20,7 +21,14 @@ from narrative_radar.classifiers import rule_based
 from narrative_radar.classifiers.ontology import Ontology, load_ontology, valid_key
 from narrative_radar.core.clock import Clock
 from narrative_radar.core.ids import new_id
-from narrative_radar.db.models import ClassificationRun, Document, RawDocument
+from narrative_radar.db.models import (
+    ClassificationRun,
+    Document,
+    InterestProfile,
+    Node,
+    RawDocument,
+)
+from narrative_radar.domains import DomainPack
 from narrative_radar.normalization.text import normalize_text
 from narrative_radar.schemas.classification import (
     SCHEMA_VERSION,
@@ -29,8 +37,20 @@ from narrative_radar.schemas.classification import (
 )
 from narrative_radar.schemas.enums import ClassificationStatus, ContentAccessStatus, NodeType
 
-PROMPT_VERSION = "classification.v1"
-GUIDELINES = Path(__file__).parent / "guidelines" / "classification_v1.md"
+# v2: 분야와 무관한 공통 지침 (DECISIONS D22). 실제 기록에는 도메인 팩 버전을 붙인다.
+PROMPT_VERSION = "classification.v2"
+GUIDELINES = Path(__file__).parent / "guidelines" / "classification_v2.md"
+
+
+def prompt_version_for(pack: DomainPack) -> str:
+    """공통 지침 + 팩 보충 지침의 조합. 둘 중 하나가 바뀌면 다시 분류할 대상이 된다."""
+    return f"{PROMPT_VERSION}+{pack.version}"
+
+
+def guidelines_for(pack: DomainPack) -> list[Path]:
+    return [GUIDELINES, *([pack.guideline] if pack.guideline else [])]
+
+
 MAX_TEXT_CHARS = 4000
 MAX_PARENT_CHARS = 500
 
@@ -71,11 +91,11 @@ def _text(session: Session, doc: Document) -> str:
 
 
 def export_batch(
-    session: Session, clock: Clock, limit: int, out_dir: Path
+    session: Session, clock: Clock, limit: int, out_dir: Path, pack: DomainPack
 ) -> tuple[Path, Path, int]:
-    """batch.jsonl(글)과 context.json(온톨로지·규칙)을 쓴다. 글 수를 돌려준다."""
+    """batch.jsonl(글)과 context.json(온톨로지·규칙·지침)을 쓴다. 글 수를 돌려준다."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    docs = pending_documents(session, limit)
+    docs = pending_documents(session, limit, prompt_version_for(pack))
     parent = aliased(Document)
     batch_path = out_dir / "batch.jsonl"
     with batch_path.open("w", encoding="utf-8") as f:
@@ -103,13 +123,26 @@ def export_batch(
     context_path = out_dir / "context.json"
     context = {
         "exported_at": clock.now().isoformat(),
-        "prompt_version": PROMPT_VERSION,
+        "prompt_version": prompt_version_for(pack),
         "schema_version": SCHEMA_VERSION,
-        "guidelines": str(GUIDELINES),
-        "ontology": load_ontology(session).to_dict(),
+        "domain": {"id": pack.id, "name": pack.name, "version": pack.version},
+        "interests": _interests(session, pack),
+        "guidelines": [str(g) for g in guidelines_for(pack)],
+        "ontology": load_ontology(session).to_dict(pack),
     }
     context_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
     return batch_path, context_path, len(docs)
+
+
+def _interests(session: Session, pack: DomainPack) -> list[dict[str, str]]:
+    """이 팩을 쓰는 관심사(루트). 분류할 때 relevance·stance의 기준이 된다."""
+    rows = session.execute(
+        sa.select(InterestProfile.name, InterestProfile.root_canonical_key, Node.label)
+        .outerjoin(Node, Node.canonical_key == InterestProfile.root_canonical_key)
+        .where(InterestProfile.domain == pack.id)
+        .order_by(InterestProfile.created_at)
+    ).all()
+    return [{"name": n, "root_key": k, "root_label": label or k} for n, k, label in rows]
 
 
 def structural_errors(output: ClassificationOutput) -> list[str]:

@@ -27,10 +27,10 @@ from narrative_radar.schemas.document import DocumentIn  # noqa: E402
 from narrative_radar.schemas.enums import RunKind, SourceHealthStatus  # noqa: E402
 from narrative_radar.wiki.build import refresh_wiki  # noqa: E402
 
-TSMC = ("TSMC", "company", "TW:2330")
-AMD = ("AMD", "company", "US:AMD")
+TSMC = ("TSMC", "organization", "TW:2330")
+AMD = ("AMD", "organization", "US:AMD")
 COWOS = ("CoWoS", "technology", "TECH:cowos")
-SAMSUNG = ("Samsung Electronics", "company", "KR:005930")
+SAMSUNG = ("Samsung Electronics", "organization", "KR:005930")
 
 WORDS = [
     "amber",

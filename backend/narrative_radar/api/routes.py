@@ -30,6 +30,7 @@ from narrative_radar.db.models import (
     Viewer,
     ViewerOverlay,
 )
+from narrative_radar.domains import get_pack
 from narrative_radar.schemas.enums import TargetType, ViewerDecision
 from narrative_radar.schemas.views import SavedViewIn
 from narrative_radar.temporal.changes import observation_gaps, what_changed
@@ -69,6 +70,7 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
     @router.get("/overview")
     def overview(session: DB, viewer: ViewerId = None) -> dict[str, object]:
         p = profile(session)
+        pack = get_pack(p.domain)
         root = session.scalar(sa.select(Node).where(Node.canonical_key == p.root_canonical_key))
         first = session.scalar(sa.select(sa.func.min(GraphEvent.available_at)))
         v = session.get(Viewer, viewer) if viewer else None
@@ -76,6 +78,7 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             "profile": {
                 "profile_id": p.profile_id,
                 "name": p.name,
+                "domain": {"id": pack.id, "name": pack.name, "lenses": list(pack.lenses)},
                 "root_key": p.root_canonical_key,
                 "root_label": root.label if root else p.root_canonical_key,
                 "root_node_id": root.node_id if root else None,

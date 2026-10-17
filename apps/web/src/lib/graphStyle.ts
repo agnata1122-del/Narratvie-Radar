@@ -3,16 +3,24 @@ import { parseColor, toCss, withAlpha } from './motion'
 
 export { withAlpha }
 
-/** 노드 유형 → 색 묶음. 6색은 모든 쌍 색각 검사를 통과하지 못해 3묶음으로 줄였다 (index.css 머리말). */
+/**
+ * 노드 유형 → 색 묶음. 유형마다 색을 주면 모든 쌍 색각 검사를 통과하지 못해 3묶음으로 줄였다
+ * (index.css 머리말, DECISIONS D20). 행위자(조직·인물) / 대상(제품·기술·주제·사건·장소) / 내러티브.
+ */
 export type SeriesGroup = 'entity' | 'concept' | 'narrative'
 
 export const TYPE_GROUP: Record<string, SeriesGroup> = {
-  company: 'entity',
-  industry: 'entity',
+  organization: 'entity',
+  person: 'entity',
+  product: 'concept',
   technology: 'concept',
   topic: 'concept',
   event: 'concept',
+  place: 'concept',
   narrative: 'narrative',
+  // 예전 값
+  company: 'entity',
+  industry: 'concept',
 }
 
 export const SERIES_GROUPS: SeriesGroup[] = ['entity', 'concept', 'narrative']
