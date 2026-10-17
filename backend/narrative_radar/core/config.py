@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     discovery_first_lookback_hours: int = 24  # 처음 검색하는 노드는 이만큼 거슬러 올라간다
     # GDELT는 15분마다 갱신되어 처음 본 시각이 늘 조금 늦다. 이보다 늦게 본 글만 backfill로 둔다.
     discovery_late_minutes: int = 90
+    # 시세 (D27): 관심사 트리의 종목 중 앞에서부터
+    price_max_instruments: int = 20
+    price_lookback_days: int = 180  # 처음 받는 종목은 이만큼 거슬러 올라간다
     # 범용 수집기 (D25)
     web_max_pages_per_run: int = 40
     web_min_interval_seconds: float = 10.0  # 같은 사이트에 다시 요청하기까지

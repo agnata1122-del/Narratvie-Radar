@@ -13,6 +13,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
 from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from narrative_radar.collectors.prices import market_of
 from narrative_radar.core.clock import Clock
 from narrative_radar.core.ids import new_id
 from narrative_radar.db.models import (
@@ -25,6 +26,7 @@ from narrative_radar.db.models import (
     InterestProfile,
     Narrative,
     Node,
+    PriceBar,
     SavedView,
     SourceAdapter,
     Viewer,
@@ -236,6 +238,54 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             "edges": edges_meta,
             "frames": out,
         }
+
+    @router.get("/prices")
+    def prices(
+        session: DB,
+        start: AwareDatetime,
+        end: AwareDatetime,
+        profile_id: ProfileQ = None,
+    ) -> dict[str, object]:
+        """트리에 있는 미국·한국 종목의 일봉 종가 (D27). end 시점에 끝나 있던 거래일만 준다.
+        해외·국내 종목을 한 화면에서 같은 기준(구간 시작 대비 변화율)으로 엮어 보는 데 쓴다."""
+        if end <= start:
+            raise HTTPException(422, "end must be after start")
+        t = end.astimezone(UTC)
+        s = graph_state(session, profile(session, profile_id), t, None, False)
+        tickers = {n.canonical_key: n for n in s.nodes if market_of(n.canonical_key)}
+        if not tickers:
+            return {"as_of": t, "series": []}
+        rows = session.execute(
+            sa.select(PriceBar.canonical_key, PriceBar.bar_date, PriceBar.close, PriceBar.currency)
+            .where(
+                PriceBar.canonical_key.in_(tickers),
+                PriceBar.interval == "1d",
+                PriceBar.closes_at <= t,
+                # 구간 시작 직전 거래일도 넣어 변화율의 기준으로 쓴다
+                PriceBar.bar_date >= (start.astimezone(UTC) - timedelta(days=7)).date(),
+            )
+            .order_by(PriceBar.canonical_key, PriceBar.bar_date)
+        ).all()
+        bars: dict[str, dict[str, float]] = {}
+        currency: dict[str, str | None] = {}
+        for key, day, close, cur in rows:
+            bars.setdefault(key, {})[day.isoformat()] = close
+            currency[key] = cur or currency.get(key)
+        series = [
+            {
+                "node_id": n.node_id,
+                "key": key,
+                "label": n.label,
+                "market": market_of(key),
+                "depth": n.depth,
+                "currency": currency.get(key),
+                "bars": [[day, close] for day, close in bars[key].items()],
+            }
+            for key, n in tickers.items()
+            if key in bars
+        ]
+        series.sort(key=lambda x: (x["depth"] if x["depth"] is not None else 99, x["label"]))
+        return {"as_of": t, "series": series}
 
     @router.get("/changes")
     def changes(

@@ -125,17 +125,9 @@ class RunContext:
                 finish_run(run, self.clock.now(), status, error)
 
 
-def profile_terms(
-    session: Session,
-    now: datetime | None = None,
-    limit: int | None = None,
-    ascii_only: bool = False,
-) -> list[str]:
-    """관심사 그래프들에 포함된 노드의 별칭을 검색어로 쓴다 (트리가 자라면 검색어도 자란다).
-
-    순서: 관심사 루트 → 최근 7일 언급이 많은 노드 → 루트에 가까운 노드. limit에서 자른다.
-    내러티브 노드(명제 문장)는 검색어로 쓰지 않는다. 같은 표기는 한 번만 쓴다 (DECISIONS D23).
-    """
+def ranked_profile_nodes(session: Session, now: datetime | None = None) -> list[str]:
+    """관심사 트리들에 포함된 노드 (내러티브 제외). 순서: 관심사 루트 → 최근 7일 언급이 많은 노드 →
+    루트에 가까운 노드 (DECISIONS D23)."""
     from narrative_radar.discovery.expansion import latest_decisions
 
     depth_of: dict[str, int] = {}
@@ -172,10 +164,23 @@ def profile_terms(
                 .group_by(NodeMention.node_id)
             ).all()
         )
-    ranked = sorted(
+    return sorted(
         (n for n in depth_of if n not in narratives),
         key=lambda n: (depth_of[n] != 0, -recent.get(n, 0), depth_of[n], n),
     )
+
+
+def profile_terms(
+    session: Session,
+    now: datetime | None = None,
+    limit: int | None = None,
+    ascii_only: bool = False,
+) -> list[str]:
+    """관심사 그래프들에 포함된 노드의 별칭을 검색어로 쓴다 (트리가 자라면 검색어도 자란다).
+
+    순서는 ranked_profile_nodes를 따르고 limit에서 자른다. 같은 표기는 한 번만 쓴다 (D23).
+    """
+    ranked = ranked_profile_nodes(session, now)
     aliases: dict[str, list[str]] = {}
     for node_id, alias in session.execute(
         sa.select(NodeAlias.node_id, NodeAlias.alias)
@@ -192,6 +197,17 @@ def profile_terms(
             if limit is not None and len(terms) >= limit:
                 return list(terms.values())
     return list(terms.values())
+
+
+def profile_keys(session: Session, now: datetime | None = None) -> list[str]:
+    """관심사 트리에 있는 노드의 canonical key (ranked_profile_nodes 순서)."""
+    ranked = ranked_profile_nodes(session, now)
+    keys = dict(
+        session.execute(
+            sa.select(Node.node_id, Node.canonical_key).where(Node.node_id.in_(ranked))
+        ).all()
+    )
+    return [keys[n] for n in ranked if n in keys]
 
 
 def due_revisits(

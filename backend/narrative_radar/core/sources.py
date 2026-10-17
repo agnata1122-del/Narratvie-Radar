@@ -50,6 +50,15 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         display_name="웹 (범용 수집)",
         base_url="",
     ),
+    # 시세 (DECISIONS D27). 토스증권 웹이 로그인 없이 쓰는 비공식 조회 API: 미국·한국 일봉
+    SourceDefinition(
+        id="toss_prices",
+        source="tossinvest",
+        kind=SourceKind.MARKET,
+        display_name="토스증권 시세 (웹)",
+        base_url="https://wts-info-api.tossinvest.com",
+        domains=("finance",),
+    ),
     # 공식 경로가 없는 소스. 데이터 이용 문의 중 (DATA_POLICY 1–2)
     SourceDefinition(
         id="dcinside_stockus",

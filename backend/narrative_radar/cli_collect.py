@@ -92,6 +92,60 @@ def collect_hackernews(
         client.close()
 
 
+@collect_app.command("prices")
+def collect_prices_cmd(
+    lookback_days: int | None = typer.Option(
+        None,
+        min=1,
+        max=1000,
+        help="처음 받는 종목이 거슬러 올라갈 날 수. 기본: NR_PRICE_LOOKBACK_DAYS",
+    ),
+) -> None:
+    """관심사 트리에 있는 미국·한국 종목의 일봉을 받는다 (토스증권 웹 시세, D27)."""
+    from narrative_radar.collectors.guard import CollectionBlocked
+    from narrative_radar.collectors.http import PoliteClient
+    from narrative_radar.collectors.prices import TossPriceSource
+    from narrative_radar.ingest.prices import (
+        PriceReport,
+        collect_prices,
+        resolve_instruments,
+        tracked_keys,
+    )
+    from narrative_radar.schemas.enums import RunKind
+
+    ctx = _context("toss_prices")
+    _require_allowed(ctx)
+    settings = ctx.settings
+    with ctx.sessions() as session:
+        keys = tracked_keys(session, ctx, settings.price_max_instruments)
+    if not keys:
+        typer.echo("관심사 트리에 미국·한국 종목 노드가 없습니다.")
+        raise typer.Exit(code=1)
+    client = PoliteClient(settings.user_agent, guard=ctx.guard())
+    source = TossPriceSource(client, ctx.clock)
+    report = PriceReport()
+    try:
+        with ctx.run(RunKind.COLLECT, {"source": "toss_prices", "keys": keys}) as run_id:
+            instruments = resolve_instruments(ctx, source, keys, report)
+            collect_prices(
+                ctx,
+                source,
+                run_id,
+                instruments,
+                lookback_days or settings.price_lookback_days,
+                report,
+            )
+    except CollectionBlocked as e:
+        _stopped(e)
+    finally:
+        client.close()
+    typer.echo(
+        f"instruments={report.instruments} new_bars={report.created} updated={report.updated}"
+    )
+    if report.unknown:
+        typer.echo(f"토스증권에서 찾지 못함: {', '.join(report.unknown)}")
+
+
 # 스트림이 현재 시각에서 이만큼 안쪽까지 오면 따라잡은 것으로 본다.
 CAUGHT_UP_SECONDS = 30
 

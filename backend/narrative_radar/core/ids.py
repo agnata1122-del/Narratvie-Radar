@@ -39,6 +39,7 @@ PREFIXES = frozenset(
         "mnt",  # node_mentions
         "cnd",  # discovered_urls (수집 후보)
         "flg",  # fetch_logs
+        "pbr",  # price_bars
     }
 )
 

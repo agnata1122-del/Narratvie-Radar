@@ -14,6 +14,7 @@ ALL_SOURCE_IDS = {
     "hackernews",
     "gdelt",
     "web",
+    "toss_prices",
     "dcinside_stockus",
     "naver_world_nvda",
 }

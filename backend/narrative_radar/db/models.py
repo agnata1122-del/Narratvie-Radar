@@ -9,7 +9,7 @@
   이력 테이블로 복원한다.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -631,3 +631,28 @@ class ControlFlag(Base):
     enabled: Mapped[bool]
     reason: Mapped[str | None] = mapped_column(sa.String(500))
     updated_at: Mapped[datetime]
+
+
+class PriceBar(Base):
+    """종목 일봉 (DECISIONS D27). 장이 끝난 날의 봉만 저장한다. 시점 재생에서는 그 거래일이 현지에서
+    끝난 시각(closes_at)이 지난 봉만 보인다. 수정주가라 분할 등으로 과거 값이 바뀌면 덮어쓴다."""
+
+    __tablename__ = "price_bars"
+    __table_args__ = (
+        sa.UniqueConstraint("source_adapter_id", "canonical_key", "interval", "bar_date"),
+    )
+
+    bar_id: Mapped[str] = mapped_column(ID, primary_key=True)
+    source_adapter_id: Mapped[str] = mapped_column(fk("source_adapters.source_adapter_id"))
+    canonical_key: Mapped[str] = mapped_column(sa.String(200), index=True)
+    interval: Mapped[str] = mapped_column(sa.String(8))  # "1d"
+    bar_date: Mapped[date]  # 거래소 현지 날짜
+    open: Mapped[float]
+    high: Mapped[float]
+    low: Mapped[float]
+    close: Mapped[float]
+    volume: Mapped[float | None]
+    currency: Mapped[str | None] = mapped_column(sa.String(8))
+    closes_at: Mapped[datetime] = mapped_column(index=True)
+    fetched_at: Mapped[datetime]
+    run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
