@@ -2,8 +2,8 @@
 
 - Reddit 글·댓글을 다시 모아 둔 Arctic Shift 공개 API에서 받는다. Reddit의 이용 허락은 확인되지
   않았으므로 원문은 `unverified`로 저장한다(내부 분석만, 화면에는 발췌·링크만).
-- 투자 서브레딧 하나(r/NVDA_Stock)는 전부 받고, 큰 서브레딧은 검색어가 들어간 것만 받는다.
-  게시물은 제목(title), 댓글은 본문(body)으로 찾는다. 게시물 전문 검색은 서버에서 시간 초과가 난다.
+- 투자 서브레딧 하나(r/NVDA_Stock)는 전부 받고, 큰 서브레딧은 검색어가 들어간 것만 남긴다.
+  댓글은 서버에서 본문(body)으로 찾고, 게시물은 다 받아 거른다(제목 검색은 시간 초과가 잦다).
 - 오래된 것부터(sort=asc) 100건씩 받고, 마지막 시각부터 이어 받는다.
 - 보관본은 늦게 채워지므로 실행마다 앞쪽을 겹쳐 받는다. 중복은 저장 단계가 걸러낸다.
 - 이미 지워진 글([deleted]/[removed])은 받지 않는다.
@@ -40,7 +40,8 @@ REMOVED = frozenset({"[deleted]", "[removed]"})
 class Query:
     kind: str  # posts | comments
     subreddit: str
-    term: str | None  # None이면 서브레딧 전체
+    term: str | None  # 서버에 묻는 검색어. None이면 서브레딧 전체를 받는다
+    keep_if_any: tuple[str, ...] = ()  # 전체를 받되 이 중 하나가 들어간 것만 남긴다
 
     @property
     def key(self) -> str:
@@ -60,7 +61,10 @@ def plan_queries(
     keyword: Sequence[str] = KEYWORD_SUBREDDITS,
 ) -> list[Query]:
     out = [Query(kind, sub, None) for sub in full for kind in ("posts", "comments")]
-    out += [Query(kind, sub, t) for sub in keyword for t in terms for kind in ("posts", "comments")]
+    for sub in keyword:
+        # 큰 서브레딧 제목 검색은 시간 초과가 잦다. 게시물은 하루 수백 건이라 다 받고 거른다
+        out.append(Query("posts", sub, None, tuple(terms)))
+        out += [Query("comments", sub, t) for t in terms]
     return out
 
 
@@ -161,10 +165,11 @@ class RedditArcticCollector:
         except (KeyError, TypeError, ValueError) as e:
             self._parse_failed(f"unexpected item shape: {e!r}")
 
-        if query.term is not None and not term_pattern(query.term).search(
-            normalize_text(f"{title}\n{text}")
-        ):
-            return None  # 서버 검색은 넓게 잡는다. 이 질의의 검색어로 다시 확인한다
+        wanted = (query.term,) if query.term else query.keep_if_any
+        if wanted:
+            normalized = normalize_text(f"{title}\n{text}")
+            if not any(term_pattern(t).search(normalized) for t in wanted):
+                return None  # 서버 검색은 넓게 잡는다. 단어 단위로 다시 확인한다
 
         return DocumentIn(
             source_adapter_id=SOURCE_ADAPTER_ID,

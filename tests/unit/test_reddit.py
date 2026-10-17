@@ -71,9 +71,10 @@ def test_plan_reads_full_subreddit_and_keyword_subreddits_per_term():
     assert [(q.kind, q.subreddit, q.term) for q in qs] == [
         ("posts", "NVDA_Stock", None),
         ("comments", "NVDA_Stock", None),
-        ("posts", "stocks", "NVDA"),
+        ("posts", "stocks", None),
         ("comments", "stocks", "NVDA"),
     ]
+    assert qs[2].keep_if_any == ("NVDA",)
 
 
 def test_post_and_comment_map_to_unverified_documents():
@@ -150,3 +151,13 @@ def test_multi_word_terms_query_one_word_and_recheck_full_phrase():
     docs = c.fetch(q, NOW - timedelta(days=60), NOW).documents
     assert seen[0]["body"] == ["Electronics"]
     assert [d.external_id for d in docs] == ["t1_c21"]
+
+
+def test_keyword_subreddit_posts_are_fetched_whole_and_filtered():
+    seen: list = []
+    other = {**POST, "id": "x2", "title": "Example post about bonds"}
+    c = make([POST, other], seen)
+    q = Query("posts", "stocks", None, ("NVDA", "HBM"))
+    docs = c.fetch(q, NOW - timedelta(days=1), NOW).documents
+    assert "title" not in seen[0]
+    assert [d.external_id for d in docs] == ["t3_abc1"]
