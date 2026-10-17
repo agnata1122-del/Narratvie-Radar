@@ -64,6 +64,7 @@ def discover_gdelt(
         settings.user_agent,
         limiter=MinIntervalLimiter(settings.gdelt_min_interval_seconds),
         guard=ctx.guard(),
+        transient_retries=settings.gdelt_transient_retries,
     )
     provider = GdeltProvider(client)
     with ctx.sessions() as session:

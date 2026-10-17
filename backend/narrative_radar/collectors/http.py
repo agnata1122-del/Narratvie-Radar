@@ -3,11 +3,15 @@
 - 모든 요청 전에 중단 상태를 확인하고 최소 간격을 기다린다.
 - 문제가 생기면(guard.py) 그 응답을 넘기지 않고 CollectionBlocked를 던진다.
   이후 요청도 모두 거부한다.
+- 예외: transient_retries를 주면 연결 끊김·시간 초과·5xx 같은 일시 오류는 간격을 두고 그만큼만
+  다시 시도한다(DECISIONS D25). 차단 신호(401·403·429 등)는 다시 시도하지 않는다. 기본값 0.
 - 정직한 User-Agent를 쓰고 브라우저로 위장하지 않는다.
 - robots.txt를 확인해 금지된 경로는 요청하지 않는다. Crawl-delay가 더 길면 그것을 따른다.
 - GET만 지원한다. 글쓰기·로그인 같은 요청은 만들 수 없다.
 """
 
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
@@ -39,6 +43,9 @@ class PoliteClient:
         guard: BlockGuard | None = None,
         transport: httpx.BaseTransport | None = None,
         timeout_seconds: float = 20.0,
+        transient_retries: int = 0,
+        retry_backoff_seconds: Sequence[float] = (15.0, 45.0),
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if "mozilla" in user_agent.lower():
             raise ValueError("user agent must identify this project, not impersonate a browser")
@@ -46,6 +53,9 @@ class PoliteClient:
         self.limiter = limiter or MinIntervalLimiter(DEFAULT_MIN_INTERVAL_SECONDS)
         self.guard = guard or BlockGuard()
         self.stats = RequestStats()
+        self.transient_retries = transient_retries
+        self.retry_backoff_seconds = tuple(retry_backoff_seconds) or (0.0,)
+        self._sleep = sleep
         self._robots: dict[str, RobotFileParser] = {}
         self._client = httpx.Client(
             headers={"User-Agent": user_agent},
@@ -74,15 +84,28 @@ class PoliteClient:
         return self._send(url, params)
 
     def _send(self, url: str, params: dict[str, str] | None = None) -> httpx.Response:
-        self.guard.check()
-        self.limiter.wait()
-        self.stats.requests += 1
-        try:
-            response = self._client.get(url, params=params)
-        except httpx.HTTPError as e:
-            self.stats.failures += 1
-            self.guard.observe_exception(url, e)
-            raise CollectionBlocked(self.guard.tripped_reason) from e
+        attempt = 0
+        while True:
+            self.guard.check()
+            self.limiter.wait()
+            self.stats.requests += 1
+            retry_left = attempt < self.transient_retries
+            try:
+                response = self._client.get(url, params=params)
+            except httpx.HTTPError as e:
+                self.stats.failures += 1
+                if retry_left:
+                    self._back_off(attempt)
+                    attempt += 1
+                    continue
+                self.guard.observe_exception(url, e)
+                raise CollectionBlocked(self.guard.tripped_reason) from e
+            if response.status_code >= 500 and retry_left:
+                self.stats.failures += 1
+                self._back_off(attempt)
+                attempt += 1
+                continue
+            break
         self.guard.observe(response)
         if self.guard.tripped:
             self.stats.failures += 1
@@ -90,6 +113,10 @@ class PoliteClient:
         if response.is_success:
             self.stats.successes += 1
         return response
+
+    def _back_off(self, attempt: int) -> None:
+        delays = self.retry_backoff_seconds
+        self._sleep(delays[min(attempt, len(delays) - 1)])
 
     def _robots_for(self, url: str) -> RobotFileParser:
         parts = urlsplit(url)

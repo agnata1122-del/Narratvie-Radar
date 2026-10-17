@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # 주제 기반 발견 (D24). GDELT는 5초에 한 번 넘게 부르면 429를 준다.
     gdelt_min_interval_seconds: float = 6.0
     gdelt_max_records: int = 75
+    gdelt_transient_retries: int = 2  # 연결 끊김·5xx는 15초·45초 뒤 두 번까지 다시 시도 (D25)
     discovery_max_queries: int = 20  # 한 번 실행에서 부르는 검색 수 (탐색 루트들이 나눠 쓴다)
     discovery_max_candidates: int = 300  # 한 번 실행에서 새로 등록하는 후보 수
     discovery_max_per_domain: int = 10  # 한 번 실행에서 한 사이트가 차지할 수 있는 후보 수

@@ -197,3 +197,65 @@ def test_author_hash_is_stable_salted_and_not_reversible_by_shape():
     assert a.hash("dcinside", "   ") is None
     with pytest.raises(ValueError):
         AuthorHasher("short")
+
+
+def _flaky(responses):
+    """순서대로 응답(또는 예외)을 돌려준다. robots.txt는 없음(404)."""
+    queue = list(responses)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        item = queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    return handler
+
+
+def _retrying(handler, retries=2):
+    sleeps: list[float] = []
+    client = PoliteClient(
+        "NarrativeRadar/test",
+        limiter=MinIntervalLimiter(0),
+        transport=httpx.MockTransport(handler),
+        transient_retries=retries,
+        retry_backoff_seconds=(15.0, 45.0),
+        sleep=sleeps.append,
+    )
+    return client, sleeps
+
+
+def test_transient_errors_are_retried_a_limited_number_of_times():
+    req = httpx.Request("GET", "https://example.com/x")
+    client, sleeps = _retrying(
+        _flaky(
+            [
+                httpx.RemoteProtocolError("disconnected", request=req),
+                httpx.Response(503),
+                httpx.Response(200, json={}),
+            ]
+        )
+    )
+    assert client.get("https://example.com/x").status_code == 200
+    assert sleeps == [15.0, 45.0] and not client.guard.tripped
+
+    client, sleeps = _retrying(_flaky([httpx.Response(502)] * 3))
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/x")
+    assert client.guard.tripped_kind == TripKind.ERROR and len(sleeps) == 2
+
+
+def test_block_signals_are_never_retried():
+    client, sleeps = _retrying(_flaky([httpx.Response(429), httpx.Response(200)]))
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/x")
+    assert client.guard.tripped_kind == TripKind.BLOCKED and sleeps == []
+
+
+def test_default_client_still_stops_on_the_first_error():
+    client, sleeps = _retrying(_flaky([httpx.Response(503), httpx.Response(200)]), retries=0)
+    with pytest.raises(CollectionBlocked):
+        client.get("https://example.com/x")
+    assert sleeps == []
