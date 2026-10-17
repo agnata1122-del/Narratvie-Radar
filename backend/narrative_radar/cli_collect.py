@@ -60,7 +60,9 @@ def collect_hackernews(
     hasher = _require_allowed(ctx)
     with ctx.sessions() as session:
         # HN은 영어권이라 영문 별칭만 검색어로 쓴다 (검색어마다 요청이 하나씩 늘어난다)
-        terms = [t for t in profile_terms(session) if t.isascii()]
+        terms = profile_terms(
+            session, ctx.clock.now(), limit=ctx.settings.max_hn_terms, ascii_only=True
+        )
     client = PoliteClient(ctx.settings.user_agent, guard=ctx.guard())
     collector = HackerNewsCollector(
         client,
@@ -113,7 +115,7 @@ def collect_bluesky(
     ctx = _context("bluesky_jetstream")
     hasher = _require_allowed(ctx)
     with ctx.sessions() as session:
-        terms = profile_terms(session)
+        terms = profile_terms(session, ctx.clock.now(), limit=ctx.settings.max_search_terms)
         base_url = get_adapter(session, ctx.source_adapter_id).base_url
     stream = JetstreamStream(ctx.settings.user_agent, ctx.guard(), base_url=f"{base_url}/subscribe")
     handler = JetstreamHandler(

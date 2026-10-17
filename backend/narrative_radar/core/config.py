@@ -26,6 +26,10 @@ class Settings(BaseSettings):
 
     # 새 글의 지표를 다시 읽는 시점(분). 수집 주기가 길면 앞쪽 시점은 다음 실행 때 읽힌다.
     revisit_offsets_minutes: tuple[int, ...] = (10, 60, 360, 1440)
+    # 수집 검색어 상한 (DECISIONS D23). 가지가 늘어도 검색어가 끝없이 늘지 않게 한다.
+    # Bluesky는 스트림을 받아 여기서 거르므로 넉넉하게, HN은 검색어마다 요청이 늘어 작게 둔다.
+    max_search_terms: int = 60
+    max_hn_terms: int = 12
 
     @property
     def database_url(self) -> str:

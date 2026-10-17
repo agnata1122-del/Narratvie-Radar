@@ -101,6 +101,8 @@ class GraphState:
     root_node_id: str | None
     nodes: list[NodeState] = field(default_factory=list)
     edges: list[EdgeState] = field(default_factory=list)
+    # 관심사가 생기기 전 시점: 그때 공통 그래프로 이 루트를 봤다면 어땠을지 되살린 것 (D7, D23)
+    reconstructed: bool = False
 
 
 def membership_at(
@@ -115,6 +117,36 @@ def membership_at(
     for node_id, status, depth in rows:
         latest[node_id] = (status, depth)
     return latest
+
+
+def reconstructed_membership(
+    session: Session, root_node_id: str, as_of: datetime, max_depth: int
+) -> dict[str, tuple[ProfileNodeStatus, int | None]]:
+    """관심사 결정 이력 없이, 시점 t의 관계 상태만으로 루트 주변을 다시 그린다.
+
+    관측 확정 관계로 닿으면 포함, 발견 후보로만 닿으면 검토 대기. 하루 예산은 적용하지 않는다.
+    """
+    from narrative_radar.discovery.expansion import shortest_depths
+
+    rows = session.execute(
+        sa.select(Edge.edge_id, Edge.source_node_id, Edge.target_node_id).where(
+            Edge.available_at <= as_of, Edge.relation_type != EdgeType.CO_MENTIONED_WITH
+        )
+    ).all()
+    status = edge_statuses_at(session, {r[0] for r in rows}, as_of)
+    confirmed = [(a, b) for e, a, b in rows if status.get(e) == EdgeStatus.CONFIRMED]
+    reachable = [
+        (a, b)
+        for e, a, b in rows
+        if status.get(e, EdgeStatus.CANDIDATE) in (EdgeStatus.CONFIRMED, EdgeStatus.CANDIDATE)
+    ]
+    members: dict[str, tuple[ProfileNodeStatus, int | None]] = {
+        n: (ProfileNodeStatus.ADMITTED, d)
+        for n, d in shortest_depths(confirmed, root_node_id, max_depth).items()
+    }
+    for n, d in shortest_depths(reachable, root_node_id, max_depth).items():
+        members.setdefault(n, (ProfileNodeStatus.PENDING_REVIEW, d))
+    return members
 
 
 def node_statuses_at(
@@ -181,16 +213,45 @@ def graph_state(
 ) -> GraphState:
     root = session.scalar(sa.select(Node).where(Node.canonical_key == profile.root_canonical_key))
     state = GraphState(as_of, profile.profile_id, root.node_id if root else None)
+    state.reconstructed = as_of < profile.created_at
     if root is None or root.available_at > as_of:
         return state
 
-    members = membership_at(session, profile, as_of)
+    if state.reconstructed:
+        members = reconstructed_membership(session, root.node_id, as_of, profile.max_depth)
+    else:
+        members = membership_at(session, profile, as_of)
+    hidden = hidden_for_viewer(session, profile.profile_id, viewer_id)
+    return _fill_state(session, state, root, members, as_of, include_pending, hidden)
+
+
+def neighborhood_state(session: Session, node: Node, as_of: datetime) -> GraphState:
+    """노드 하나와 그 바로 옆(관측 확정·발견 후보 관계) 상태.
+
+    관심사와 무관한 노드 중심 보기다 (위키, 관심사 밖 노드 정보).
+    """
+    state = GraphState(as_of, "", node.node_id)
+    if node.available_at > as_of:
+        return state
+    members = reconstructed_membership(session, node.node_id, as_of, 1)
+    return _fill_state(session, state, node, members, as_of, True, set())
+
+
+def _fill_state(
+    session: Session,
+    state: GraphState,
+    root: Node,
+    members: dict[str, tuple[ProfileNodeStatus, int | None]],
+    as_of: datetime,
+    include_pending: bool,
+    hidden: set[str],
+) -> GraphState:
     wanted = {ProfileNodeStatus.ADMITTED} | (
         {ProfileNodeStatus.PENDING_REVIEW} if include_pending else set()
     )
     node_ids = {nid for nid, (status, _) in members.items() if status in wanted}
     node_ids.add(root.node_id)
-    node_ids -= hidden_for_viewer(session, profile.profile_id, viewer_id)
+    node_ids -= hidden
 
     nodes = {
         n.node_id: n

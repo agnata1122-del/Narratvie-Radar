@@ -45,7 +45,10 @@ class GraphKit:
 
     @property
     def profile(self) -> InterestProfile:
-        return self.session.scalars(sa.select(InterestProfile)).one()
+        """처음 등록한 최상위 관심사 (가지가 생겨도 그대로)."""
+        return self.session.scalars(
+            sa.select(InterestProfile).where(InterestProfile.parent_profile_id.is_(None))
+        ).one()
 
     def doc(self, text, author="a", mode="live", published=None):
         self.n += 1

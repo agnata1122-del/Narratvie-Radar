@@ -32,6 +32,7 @@ from narrative_radar.schemas.enums import (
     NodeType,
     Polarity,
     ProfileNodeStatus,
+    ProfileOrigin,
     RunKind,
     RunMode,
     RunStatus,
@@ -91,6 +92,13 @@ class InterestProfile(Base):
     name: Mapped[str] = mapped_column(sa.String(200))
     # 도메인 팩 ID (domains/registry.py). 키 규칙·분류 지침 보충·소스·렌즈를 정한다 (DECISIONS D22)
     domain: Mapped[str] = mapped_column(sa.String(32), server_default="general")
+    # 가지: 어느 관심사의 노드에서 파고들어 생겼나. created_at이 갈라진 시각이다 (DECISIONS D23)
+    parent_profile_id: Mapped[str | None] = mapped_column(
+        fk("interest_profiles.profile_id"), index=True
+    )
+    origin: Mapped[ProfileOrigin] = mapped_column(
+        str_enum(ProfileOrigin), server_default=ProfileOrigin.REGISTERED.value
+    )
     root_canonical_key: Mapped[str] = mapped_column(sa.String(200))
     max_depth: Mapped[int] = mapped_column(default=2)
     auto_expand: Mapped[bool] = mapped_column(default=True)

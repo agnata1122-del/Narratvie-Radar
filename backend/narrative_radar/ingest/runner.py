@@ -31,14 +31,18 @@ from narrative_radar.db.models import (
     Document,
     DocumentMetricSnapshot,
     InterestProfile,
+    Node,
     NodeAlias,
+    NodeMention,
     PipelineRun,
     ProfileNode,
 )
 from narrative_radar.ingest.health import record_health
 from narrative_radar.ingest.runs import finish_run, start_run
 from narrative_radar.ingest.store import DocumentStore
+from narrative_radar.normalization.text import normalize_text
 from narrative_radar.schemas.enums import (
+    NodeType,
     ProfileNodeStatus,
     RunKind,
     RunStatus,
@@ -117,17 +121,73 @@ class RunContext:
                 finish_run(run, self.clock.now(), status, error)
 
 
-def profile_terms(session: Session) -> list[str]:
-    """관심사 그래프에 포함된 노드의 별칭을 검색어로 쓴다."""
-    admitted = (
-        sa.select(ProfileNode.node_id)
-        .join(InterestProfile, InterestProfile.profile_id == ProfileNode.profile_id)
-        .where(ProfileNode.status == ProfileNodeStatus.ADMITTED)
+def profile_terms(
+    session: Session,
+    now: datetime | None = None,
+    limit: int | None = None,
+    ascii_only: bool = False,
+) -> list[str]:
+    """관심사 그래프들에 포함된 노드의 별칭을 검색어로 쓴다 (트리가 자라면 검색어도 자란다).
+
+    순서: 관심사 루트 → 최근 7일 언급이 많은 노드 → 루트에 가까운 노드. limit에서 자른다.
+    내러티브 노드(명제 문장)는 검색어로 쓰지 않는다. 같은 표기는 한 번만 쓴다 (DECISIONS D23).
+    """
+    from narrative_radar.discovery.expansion import latest_decisions
+
+    depth_of: dict[str, int] = {}
+    for profile_id in session.scalars(sa.select(InterestProfile.profile_id)):
+        latest = session.execute(
+            sa.select(ProfileNode.node_id, ProfileNode.depth)
+            .where(ProfileNode.profile_id == profile_id)
+            .order_by(ProfileNode.available_at, ProfileNode.decision_id)
+        ).all()
+        depth_by_node = {node_id: depth for node_id, depth in latest}
+        for node_id, status in latest_decisions(session, profile_id).items():
+            if status == ProfileNodeStatus.ADMITTED:
+                d = depth_by_node.get(node_id) or 0
+                depth_of[node_id] = min(depth_of.get(node_id, d), d)
+    if not depth_of:
+        return []
+    narratives = set(
+        session.scalars(
+            sa.select(Node.node_id).where(
+                Node.node_id.in_(depth_of), Node.node_type == NodeType.NARRATIVE
+            )
+        )
     )
-    aliases = session.scalars(
-        sa.select(NodeAlias.alias).where(NodeAlias.node_id.in_(admitted)).order_by(NodeAlias.alias)
-    ).all()
-    return list(dict.fromkeys(aliases))
+    recent: dict[str, int] = {}
+    if now is not None:
+        recent = dict(
+            session.execute(
+                sa.select(NodeMention.node_id, sa.func.count())
+                .where(
+                    NodeMention.node_id.in_(depth_of),
+                    NodeMention.published_at > now - timedelta(days=7),
+                    NodeMention.available_at <= now,
+                )
+                .group_by(NodeMention.node_id)
+            ).all()
+        )
+    ranked = sorted(
+        (n for n in depth_of if n not in narratives),
+        key=lambda n: (depth_of[n] != 0, -recent.get(n, 0), depth_of[n], n),
+    )
+    aliases: dict[str, list[str]] = {}
+    for node_id, alias in session.execute(
+        sa.select(NodeAlias.node_id, NodeAlias.alias)
+        .where(NodeAlias.node_id.in_(ranked))
+        .order_by(NodeAlias.alias)
+    ):
+        aliases.setdefault(node_id, []).append(alias)
+    terms: dict[str, str] = {}  # 정규화 표기 → 원래 표기
+    for node_id in ranked:
+        for alias in aliases.get(node_id, []):
+            if ascii_only and not alias.isascii():
+                continue
+            terms.setdefault(normalize_text(alias), alias)
+            if limit is not None and len(terms) >= limit:
+                return list(terms.values())
+    return list(terms.values())
 
 
 def due_revisits(

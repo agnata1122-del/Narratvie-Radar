@@ -30,12 +30,13 @@ from narrative_radar.db.models import (
     Viewer,
     ViewerOverlay,
 )
+from narrative_radar.discovery.branch import BranchError, create_branch, lineage
 from narrative_radar.domains import get_pack
 from narrative_radar.schemas.enums import TargetType, ViewerDecision
 from narrative_radar.schemas.views import SavedViewIn
 from narrative_radar.temporal.changes import observation_gaps, what_changed
 from narrative_radar.temporal.narratives import narrative_state_at
-from narrative_radar.temporal.state import GraphState, graph_state
+from narrative_radar.temporal.state import GraphState, graph_state, neighborhood_state
 from narrative_radar.wiki.build import latest_revision
 
 VISIT_GAP = timedelta(minutes=30)
@@ -52,12 +53,36 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
 
     DB = Annotated[Session, Depends(db)]
     ViewerId = Annotated[str | None, Cookie(alias=VIEWER_COOKIE)]
+    # 어느 관심사(가지)를 보는가. 비우면 처음 등록한 최상위 관심사 (DECISIONS D23)
+    ProfileQ = Annotated[str | None, Query(alias="profile", max_length=40)]
 
-    def profile(session: Session) -> InterestProfile:
-        p = session.scalars(sa.select(InterestProfile).order_by(InterestProfile.created_at)).first()
+    def profile(session: Session, profile_id: str | None = None) -> InterestProfile:
+        if profile_id:
+            p = session.get(InterestProfile, profile_id)
+            if p is None:
+                raise HTTPException(404, "unknown interest profile")
+            return p
+        p = session.scalars(
+            sa.select(InterestProfile).order_by(
+                InterestProfile.parent_profile_id.is_not(None), InterestProfile.created_at
+            )
+        ).first()
         if p is None:
             raise HTTPException(503, "no interest profile; run `nr db init`")
         return p
+
+    def profile_summary(session: Session, p: InterestProfile) -> dict[str, object]:
+        root = session.scalar(sa.select(Node).where(Node.canonical_key == p.root_canonical_key))
+        return {
+            "profile_id": p.profile_id,
+            "name": p.name,
+            "root_label": root.label if root else p.root_canonical_key,
+            "root_node_id": root.node_id if root else None,
+            "root_type": root.node_type.value if root else None,
+            "parent_profile_id": p.parent_profile_id,
+            "origin": p.origin.value,
+            "created_at": p.created_at,
+        }
 
     def known_viewer(session: Session, viewer_id: str | None) -> str | None:
         if viewer_id and session.get(Viewer, viewer_id) is not None:
@@ -68,8 +93,10 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         return value.astimezone(UTC) if value else clock.now()
 
     @router.get("/overview")
-    def overview(session: DB, viewer: ViewerId = None) -> dict[str, object]:
-        p = profile(session)
+    def overview(
+        session: DB, viewer: ViewerId = None, profile_id: ProfileQ = None
+    ) -> dict[str, object]:
+        p = profile(session, profile_id)
         pack = get_pack(p.domain)
         root = session.scalar(sa.select(Node).where(Node.canonical_key == p.root_canonical_key))
         first = session.scalar(sa.select(sa.func.min(GraphEvent.available_at)))
@@ -86,7 +113,20 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
                 "auto_expand": p.auto_expand,
                 "max_new_nodes_per_day": p.max_new_nodes_per_day,
                 "minimum_independent_evidence": p.minimum_independent_evidence,
+                "origin": p.origin.value,
+                "created_at": p.created_at,
+                "parent_profile_id": p.parent_profile_id,
             },
+            # 루트 관심사부터 지금 가지까지의 경로, 이 가지에서 갈라진 가지들
+            "lineage": [profile_summary(session, x) for x in lineage(session, p)],
+            "children": [
+                profile_summary(session, c)
+                for c in session.scalars(
+                    sa.select(InterestProfile)
+                    .where(InterestProfile.parent_profile_id == p.profile_id)
+                    .order_by(InterestProfile.created_at)
+                )
+            ],
             "sources": [
                 {
                     "id": s.source_adapter_id,
@@ -134,10 +174,11 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         as_of: AwareDatetime | None = None,
         include_pending: bool = True,
         viewer: ViewerId = None,
+        profile_id: ProfileQ = None,
     ) -> dict[str, object]:
         t = at(as_of)
         s = graph_state(
-            session, profile(session), t, known_viewer(session, viewer), include_pending
+            session, profile(session, profile_id), t, known_viewer(session, viewer), include_pending
         )
         return _state_payload(session, s, t)
 
@@ -149,11 +190,16 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         steps: Annotated[int, Query(ge=2, le=MAX_FRAMES)] = 48,
         include_pending: bool = False,
         viewer: ViewerId = None,
+        profile_id: ProfileQ = None,
     ) -> dict[str, object]:
-        """재생용 프레임. 노드·관계 메타데이터는 한 번만 보내고 프레임에는 바뀌는 값만 담는다."""
+        """재생용 프레임. 노드·관계 메타데이터는 한 번만 보내고 프레임에는 바뀌는 값만 담는다.
+
+        노드 값: [관심도, 상태, 포함 여부, 최근 7일 언급, 깊이]. 관심사가 생기기 전 프레임은
+        공통 그래프로 되살린 재구성이다 (reconstructed).
+        """
         if end <= start:
             raise HTTPException(422, "end must be after start")
-        p, vid = profile(session), known_viewer(session, viewer)
+        p, vid = profile(session, profile_id), known_viewer(session, viewer)
         step = (end - start) / (steps - 1)
         nodes_meta: dict[str, dict[str, object]] = {}
         edges_meta: dict[str, dict[str, object]] = {}
@@ -173,8 +219,9 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             out.append(
                 {
                     "t": t,
+                    "reconstructed": s.reconstructed,
                     "nodes": {
-                        n.node_id: [n.activity, n.status, n.membership, n.mentions_7d]
+                        n.node_id: [n.activity, n.status, n.membership, n.mentions_7d, n.depth]
                         for n in s.nodes
                     },
                     "edges": {
@@ -182,7 +229,13 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
                     },
                 }
             )
-        return {"nodes": nodes_meta, "edges": edges_meta, "frames": out}
+        return {
+            "profile_id": p.profile_id,
+            "profile_created_at": p.created_at,
+            "nodes": nodes_meta,
+            "edges": edges_meta,
+            "frames": out,
+        }
 
     @router.get("/changes")
     def changes(
@@ -190,12 +243,14 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         until: AwareDatetime | None = None,
         since: AwareDatetime | None = None,
         viewer: ViewerId = None,
+        profile_id: ProfileQ = None,
     ) -> dict[str, object]:
         u = at(until)
         s = since.astimezone(UTC) if since else u - timedelta(days=1)
         if s >= u:
             raise HTTPException(422, "since must be before until")
-        report = what_changed(session, profile(session), s, u, known_viewer(session, viewer))
+        p = profile(session, profile_id)
+        report = what_changed(session, p, s, u, known_viewer(session, viewer))
         return asdict(report)
 
     @router.get("/events")
@@ -228,14 +283,28 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
 
     @router.get("/nodes/{node_id}")
     def node_detail(
-        node_id: str, session: DB, as_of: AwareDatetime | None = None, viewer: ViewerId = None
+        node_id: str,
+        session: DB,
+        as_of: AwareDatetime | None = None,
+        viewer: ViewerId = None,
+        profile_id: ProfileQ = None,
     ) -> dict[str, object]:
         t = at(as_of)
         node = session.get(Node, node_id)
         if node is None or node.available_at > t:
             raise HTTPException(404, "node not known at this time")
-        s = graph_state(session, profile(session), t, known_viewer(session, viewer))
+        s = graph_state(session, profile(session, profile_id), t, known_viewer(session, viewer))
         me = next((n for n in s.nodes if n.node_id == node_id), None)
+        if me is None:  # 이 관심사 밖의 노드는 노드 중심 상태로 보여준다
+            me = next(
+                (n for n in neighborhood_state(session, node, t).nodes if n.node_id == node_id),
+                None,
+            )
+        branch = session.scalar(
+            sa.select(InterestProfile.profile_id).where(
+                InterestProfile.root_canonical_key == node.canonical_key
+            )
+        )
         rev = latest_revision(session, node_id, as_of=t)
         narrative = session.scalar(sa.select(Narrative).where(Narrative.node_id == node_id))
         snap = narrative_state_at(session, narrative.narrative_id, t) if narrative else None
@@ -252,6 +321,8 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             "narrative": {"proposition": narrative.proposition, **asdict(snap)}
             if narrative and snap
             else None,
+            # 이 노드를 루트로 하는 관심사(가지)가 이미 있으면 그 ID
+            "branch_profile_id": branch,
         }
 
     @router.get("/edges/{edge_id}")
@@ -305,11 +376,13 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         decision: Literal["approved", "rejected", "hidden"]
 
     @router.post("/overlays")
-    def set_overlay(body: OverlayIn, session: DB, viewer: ViewerId = None) -> dict[str, str]:
+    def set_overlay(
+        body: OverlayIn, session: DB, viewer: ViewerId = None, profile_id: ProfileQ = None
+    ) -> dict[str, str]:
         vid = known_viewer(session, viewer)
         if vid is None:
             raise HTTPException(401, "visit first: POST /api/viewer/visit")
-        p = profile(session)
+        p = profile(session, profile_id)
         existing = session.get(ViewerOverlay, (vid, p.profile_id, TargetType.NODE, body.target_id))
         if existing is None:
             session.add(
@@ -328,11 +401,13 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         return {"status": "ok"}
 
     @router.delete("/overlays/{target_id}")
-    def clear_overlay(target_id: str, session: DB, viewer: ViewerId = None) -> dict[str, str]:
+    def clear_overlay(
+        target_id: str, session: DB, viewer: ViewerId = None, profile_id: ProfileQ = None
+    ) -> dict[str, str]:
         vid = known_viewer(session, viewer)
         if vid is None:
             raise HTTPException(401, "visit first")
-        p = profile(session)
+        p = profile(session, profile_id)
         existing = session.get(ViewerOverlay, (vid, p.profile_id, TargetType.NODE, target_id))
         if existing is not None:
             session.delete(existing)
@@ -348,7 +423,9 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         return [{"view_id": v.view_id, "name": v.name, "filters": v.filters} for v in rows]
 
     @router.post("/views")
-    def save_view(body: SavedViewIn, session: DB, viewer: ViewerId = None) -> dict[str, str]:
+    def save_view(
+        body: SavedViewIn, session: DB, viewer: ViewerId = None, profile_id: ProfileQ = None
+    ) -> dict[str, str]:
         vid = known_viewer(session, viewer)
         if vid is None:
             raise HTTPException(401, "visit first")
@@ -356,7 +433,7 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         view = SavedView(
             view_id=new_id("vew", now),
             viewer_id=vid,
-            profile_id=profile(session).profile_id,
+            profile_id=profile(session, profile_id).profile_id,
             name=body.view_name,
             filters=body.model_dump(mode="json"),
             created_at=now,
@@ -391,6 +468,36 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
         )
         session.commit()
         return {"status": "ok"}
+
+    @router.get("/profiles")
+    def list_profiles(session: DB) -> list[dict[str, object]]:
+        """관심사와 가지 전체 (트리는 parent_profile_id로 잇는다)."""
+        return [
+            profile_summary(session, p)
+            for p in session.scalars(
+                sa.select(InterestProfile).order_by(InterestProfile.created_at)
+            )
+        ]
+
+    class BranchIn(BaseModel):
+        parent_profile_id: str = Field(max_length=40)
+        node_id: str = Field(max_length=40)
+
+    @router.post("/profiles/branch")
+    def branch(body: BranchIn, session: DB, viewer: ViewerId = None) -> dict[str, object]:
+        """노드에서 파고들어 그 노드를 루트로 하는 가지를 만든다. 이미 있으면 그것을 돌려준다.
+
+        가지는 수집 검색어를 늘리므로 방문 기록이 있는 사람만 만들 수 있고, 개수·깊이 상한이 있다.
+        """
+        if known_viewer(session, viewer) is None:
+            raise HTTPException(401, "visit first: POST /api/viewer/visit")
+        parent = profile(session, body.parent_profile_id)
+        try:
+            result = create_branch(session, clock, parent, body.node_id)
+        except BranchError as e:
+            raise HTTPException(409, str(e)) from None
+        session.commit()
+        return {"created": result.created, **profile_summary(session, result.profile)}
 
     return router
 

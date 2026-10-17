@@ -25,7 +25,8 @@ def wiki_refresh() -> None:
         run = start_run(
             session, clock, RunKind.WIKI, model=GENERATOR, schema_version=SCHEMA_VERSION
         )
-        for profile in session.scalars(sa.select(InterestProfile)):
-            created, unchanged = refresh_wiki(session, clock, run.run_id, profile)
-            typer.echo(f"profile {profile.name!r}: revisions+={created} unchanged={unchanged}")
+        profiles = list(session.scalars(sa.select(InterestProfile)))
+        # 위키는 노드 중심이라 관심사가 여럿이어도 노드마다 한 번만 만든다 (D23)
+        created, unchanged = refresh_wiki(session, clock, run.run_id, profiles)
+        typer.echo(f"profiles={len(profiles)} revisions+={created} unchanged={unchanged}")
         finish_run(run, clock.now(), RunStatus.SUCCEEDED)

@@ -68,8 +68,13 @@ class ExpansionReport:
 
 
 def expand_profile(
-    session: Session, clock: Clock, run_id: str, profile: InterestProfile
+    session: Session,
+    clock: Clock,
+    run_id: str,
+    profile: InterestProfile,
+    ignore_budget: bool = False,
 ) -> ExpansionReport:
+    """ignore_budget: 가지를 처음 만들 때는 이미 확정된 주변을 한 번에 담는다 (D23)."""
     report = ExpansionReport()
     root = session.scalar(sa.select(Node).where(Node.canonical_key == profile.root_canonical_key))
     if root is None:
@@ -130,7 +135,7 @@ def expand_profile(
             continue
         if not profile.auto_expand:
             decide(node_id, ProfileNodeStatus.PENDING_REVIEW, depth, "auto expansion is off")
-        elif used >= profile.max_new_nodes_per_day:
+        elif used >= profile.max_new_nodes_per_day and not ignore_budget:
             decide(node_id, ProfileNodeStatus.PENDING_REVIEW, depth, "daily budget exhausted")
         else:
             decide(node_id, ProfileNodeStatus.ADMITTED, depth, f"confirmed path at depth {depth}")

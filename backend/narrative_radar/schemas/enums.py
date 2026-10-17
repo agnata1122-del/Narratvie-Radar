@@ -30,6 +30,14 @@ class IngestMode(StrEnum):
     MANUAL_IMPORT = "manual_import"
 
 
+class ProfileOrigin(StrEnum):
+    """관심사가 어떻게 생겼나 (DECISIONS D23)."""
+
+    REGISTERED = "registered"  # 사용자가 직접 등록
+    BRANCH = "branch"  # 다른 관심사의 노드에서 파고들어 생긴 가지
+    EXPLORE = "explore"  # 즉석 탐색에서 등록 (M10)
+
+
 class RunKind(StrEnum):
     SETUP = "setup"
     COLLECT = "collect"

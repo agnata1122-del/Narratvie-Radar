@@ -8,6 +8,7 @@
 """
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -24,12 +25,13 @@ from narrative_radar.db.models import (
     InterestProfile,
     Narrative,
     NarrativeClaim,
+    Node,
     NodeAlias,
     WikiRevision,
 )
 from narrative_radar.schemas.enums import EdgeType, NarrativeRole
 from narrative_radar.temporal.narratives import narrative_state_at
-from narrative_radar.temporal.state import GraphState, NodeState, graph_state
+from narrative_radar.temporal.state import GraphState, NodeState, graph_state, neighborhood_state
 
 SCHEMA_VERSION = "wiki.v1"
 GENERATOR = "facts.v1"  # LLM 없이 사실로 만든 위키
@@ -284,13 +286,29 @@ def latest_revision(
 
 
 def refresh_wiki(
-    session: Session, clock: Clock, run_id: str, profile: InterestProfile
+    session: Session,
+    clock: Clock,
+    run_id: str,
+    profiles: InterestProfile | Sequence[InterestProfile],
 ) -> tuple[int, int]:
-    """관심사 그래프의 노드마다 위키를 다시 만들고, 바뀐 것만 새 리비전으로 저장한다."""
+    """관심사 그래프들에 들어 있는 노드마다 위키를 다시 만들고, 바뀐 것만 새 리비전으로 저장한다.
+
+    위키는 노드 중심이다: 어느 관심사에서 보든 같은 노드는 같은 위키를 쓴다. 내용은 공통 그래프에서
+    그 노드의 바로 옆(관측 확정·발견 후보 관계)으로 만든다 (DECISIONS D23).
+    """
     now = clock.now()
-    state = graph_state(session, profile, now, include_pending=False)
+    if isinstance(profiles, InterestProfile):
+        profiles = [profiles]
+    node_ids: dict[str, None] = {}
+    for profile in profiles:
+        for n in graph_state(session, profile, now, include_pending=False).nodes:
+            node_ids.setdefault(n.node_id)
     created = unchanged = 0
-    for node in state.nodes:
+    for node_id in node_ids:
+        state = neighborhood_state(session, session.get_one(Node, node_id), now)
+        if not any(n.node_id == node_id for n in state.nodes):
+            continue
+        node = next(n for n in state.nodes if n.node_id == node_id)
         sections = build_sections(session, state, node.node_id)
         prints = {s.key: s.fingerprint() for s in sections}
         prev = latest_revision(session, node.node_id)
