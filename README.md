@@ -64,6 +64,7 @@ uv run nr classify ingest <out.jsonl> --model <이름>   # 분류 결과 검증�
 uv run nr classify baseline                 # 규칙 기반 기준 분류
 uv run nr graph build                       # 분류 결과를 그래프에 반영
 uv run nr wiki refresh                      # 위키 갱신
+uv run nr profile add <키> --label ... --type ... --alias ... --reason ...   # 관심사 트리에 노드 직접 추가 (별칭이 검색어가 된다)
 ```
 
 ### 화면
