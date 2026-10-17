@@ -4,7 +4,7 @@
 
 ## 시작 전에 소유자가 할 일
 
-1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가.
+1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
 2. **비밀값**: 같은 설정의 환경변수에 `NR_LIVE_COLLECTION_ENABLED=true`, `NR_AUTHOR_HASH_SALT=<무작위 64자>` 추가. salt는 한 번 정하면 바꾸지 않는다.
 3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소(예: `Narratvie-Radar-data`)를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). 데이터 내보내기·복원 명령은 저장소가 준비되면 만든다.
 
@@ -29,6 +29,8 @@ NR_REVISIT_OFFSETS_MINUTES='[180, 360, 1440]'   # 지표 재방문: 3시간·6�
 uv run nr collect hackernews --max-cycles 1 --lookback-minutes 240
 uv run nr collect bluesky --until-caught-up --max-minutes 30
 uv run nr collect bluesky-metrics
+uv run nr discover plan            # 이번에 검색할 노드·검색식 (요청 없음)
+uv run nr discover gdelt           # GDELT로 수집 후보·헤드라인 등록 (D25)
 
 # 2. 분류 (대기열이 빌 때까지 반복)
 uv run nr classify pending --limit 50
@@ -46,6 +48,8 @@ uv run nr sources report --hours 6
 
 # 5. 데이터 저장 (보관 저장소 준비 후)
 ```
+
+모든 발견·수집을 바로 멈춰야 하면 `uv run nr emergency stop --reason "..."`(풀 때는 `resume`).
 
 수집기가 멈추면(`blocked` / `stopped`) 그 주기는 나머지 단계만 진행하고, 원인을 기록해 소유자에게 알린다. 다음 주기에 자동으로 다시 켜지 않는다(DATA_POLICY 5).
 

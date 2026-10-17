@@ -30,6 +30,22 @@ class Settings(BaseSettings):
     # Bluesky는 스트림을 받아 여기서 거르므로 넉넉하게, HN은 검색어마다 요청이 늘어 작게 둔다.
     max_search_terms: int = 60
     max_hn_terms: int = 12
+    # 주제 기반 발견 (D24). GDELT는 5초에 한 번 넘게 부르면 429를 준다.
+    gdelt_min_interval_seconds: float = 6.0
+    gdelt_max_records: int = 75
+    discovery_max_queries: int = 20  # 한 번 실행에서 부르는 검색 수 (탐색 루트들이 나눠 쓴다)
+    discovery_max_candidates: int = 300  # 한 번 실행에서 새로 등록하는 후보 수
+    discovery_max_per_domain: int = 10  # 한 번 실행에서 한 사이트가 차지할 수 있는 후보 수
+    discovery_first_lookback_hours: int = 24  # 처음 검색하는 노드는 이만큼 거슬러 올라간다
+    # GDELT는 15분마다 갱신되어 처음 본 시각이 늘 조금 늦다. 이보다 늦게 본 글만 backfill로 둔다.
+    discovery_late_minutes: int = 90
+    # 범용 수집기 (D25)
+    web_max_pages_per_run: int = 40
+    web_min_interval_seconds: float = 10.0  # 같은 사이트에 다시 요청하기까지
+    web_max_bytes: int = 2_000_000
+    web_max_redirects: int = 3
+    web_transient_retries: int = 2  # 같은 후보에 일시 오류가 이만큼 넘으면 실패로 둔다
+    web_breaker_transient_limit: int = 5  # 한 사이트에서 일시 오류가 연달아 이만큼이면 차단기 작동
 
     @property
     def database_url(self) -> str:

@@ -22,6 +22,7 @@ from narrative_radar.collectors.bluesky import (
     JetstreamStream,
     SavePost,
 )
+from narrative_radar.collectors.control import emergency_stop_reason
 from narrative_radar.collectors.gate import auto_stop, can_collect, get_adapter
 from narrative_radar.collectors.guard import BlockGuard, CollectionBlocked, TripKind
 from narrative_radar.collectors.hackernews import HackerNewsCollector
@@ -75,7 +76,10 @@ class RunContext:
 
     def require_allowed(self) -> AuthorHasher:
         with self.sessions() as session:
+            stopped = emergency_stop_reason(session)
             decision = can_collect(self.settings, get_adapter(session, self.source_adapter_id))
+        if stopped is not None:
+            raise CollectionNotAllowed(f"emergency stop is on: {stopped}")
         if not decision.allowed:
             raise CollectionNotAllowed(decision.reason)
         assert self.settings.author_hash_salt is not None

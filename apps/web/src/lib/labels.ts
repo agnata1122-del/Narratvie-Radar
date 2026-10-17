@@ -107,6 +107,20 @@ export const EVIDENCE_STATUS_LABEL: Record<string, string> = {
 export const SOURCE_LABEL: Record<string, string> = {
   bluesky_jetstream: 'Bluesky',
   hackernews: 'Hacker News',
+  gdelt: 'GDELT',
+  web: '웹',
   dcinside_stockus: '미주갤',
   naver_world_nvda: '네이버 해외주식 토론',
+}
+
+/** 범용 수집으로 들어온 웹 문서는 소스 이름 대신 사이트 주소를 보여준다 (D24). */
+export function sourceName(source: string, url?: string | null): string {
+  if (source === 'web' && url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '')
+    } catch {
+      // 주소가 이상하면 소스 이름으로 둔다
+    }
+  }
+  return label(SOURCE_LABEL, source)
 }

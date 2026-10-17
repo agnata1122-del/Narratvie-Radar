@@ -16,6 +16,8 @@ class SourceKind(StrEnum):
     COMMUNITY = "community"
     MARKET = "market"
     OFFICIAL = "official"
+    NEWS = "news"  # 뉴스 발견 (GDELT 등)
+    WEB = "web"  # 범용 수집기가 가져온 웹 페이지 (D24)
 
 
 class ContentAccessStatus(StrEnum):
@@ -228,3 +230,30 @@ class SourceHealthStatus(StrEnum):
     DOWN = "down"
     PAUSED = "paused"
     BLOCKED = "blocked"
+
+
+class CandidateStatus(StrEnum):
+    """발견한 URL이 수집 후보로서 어디까지 왔나 (D24)."""
+
+    NEW = "new"  # 발견됨, 제목만 문서로 들어감
+    FETCHED = "fetched"  # 본문을 가져와 문서를 채움
+    SKIPPED = "skipped"  # 정책상 건너뜀 (robots, noai, 거부 사이트, 형식)
+    BLOCKED = "blocked"  # 사이트 차단으로 멈춤
+    FAILED = "failed"  # 일시 오류 재시도 한도를 넘음
+
+
+class SitePolicyStatus(StrEnum):
+    """사이트(도메인)별 수집 허용 상태. 사이트 단위 차단기의 상태이기도 하다 (D25)."""
+
+    PENDING_REVIEW = "pending_review"  # 새로 발견된 사이트: 정책 확인 전에는 가져오지 않는다
+    ALLOWED = "allowed"  # 소유자가 이용 조건을 확인하고 허용
+    DENIED = "denied"  # 이용 조건상 자동 수집 금지 등으로 거부
+    BLOCKED = "blocked"  # 차단 신호로 자동 중단. 자동 재시도 없음
+
+
+class FetchOutcome(StrEnum):
+    OK = "ok"
+    BLOCKED = "blocked"  # 401/403/429/451, 캡차, 로그인 요구
+    TRANSIENT = "transient"  # 5xx, 시간 초과, 연결 오류: 제한적으로 재시도
+    SKIPPED = "skipped"  # robots·noai·형식·크기 등으로 받지 않음
+    REJECTED = "rejected"  # 안전 규칙 위반 (사설 IP, 허용 안 된 리다이렉트 등)

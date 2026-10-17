@@ -1,7 +1,7 @@
 import type { ComponentType, SVGProps } from 'react'
 import type { ChangeItem, ChangeReport } from '../api'
 import { changeKey, type ChangeWindow } from '../lib/changes'
-import { CAUSE_LABEL, CHANGE_KIND_LABEL, NARRATIVE_STATE_LABEL, RELATION_LABEL, SOURCE_LABEL, label } from '../lib/labels'
+import { CAUSE_LABEL, CHANGE_KIND_LABEL, NARRATIVE_STATE_LABEL, RELATION_LABEL, label, sourceName } from '../lib/labels'
 import { formatTime, relativeTime } from '../lib/time'
 import { safeHref } from '../lib/url'
 import { LinkOutIcon, ShiftIcon, SparkIcon, TrendDownIcon, TrendUpIcon, WarnIcon } from './icons'
@@ -87,7 +87,7 @@ function Card({ item, active, onPick, until, order }: { item: ChangeItem; active
                 return (
                   <li key={ev.document_id} className="text-xs">
                     <div className="flex items-center gap-1.5 text-[11px] text-nr-muted">
-                      <span className="font-medium text-nr-text-2">{label(SOURCE_LABEL, ev.source)}</span>
+                      <span className="font-medium text-nr-text-2">{sourceName(ev.source, ev.url)}</span>
                       <span className="tabular-nums">{formatTime(ev.published_at)}</span>
                       {href && (
                         <a

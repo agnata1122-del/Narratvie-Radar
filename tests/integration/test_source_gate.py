@@ -5,6 +5,7 @@ from narrative_radar.cli import app
 from narrative_radar.collectors.gate import auto_stop, can_collect, set_status
 from narrative_radar.collectors.guard import TripKind
 from narrative_radar.core.config import Settings
+from narrative_radar.core.sources import DEFAULT_SOURCES
 from narrative_radar.db.models import SourceAdapter
 from narrative_radar.db.seed import seed_defaults
 from narrative_radar.schemas.enums import SourceAccessStatus
@@ -75,6 +76,8 @@ def test_cli_enable_requires_explicit_policy_acknowledgement(db_url, session, cl
         adapter = _adapter(session)
         assert adapter.access_status == SourceAccessStatus.PAUSED
         assert adapter.live_enabled is False
-        assert session.scalar(sa.select(sa.func.count()).select_from(SourceAdapter)) == 4
+        assert session.scalar(sa.select(sa.func.count()).select_from(SourceAdapter)) == len(
+            DEFAULT_SOURCES
+        )
     finally:
         get_settings.cache_clear()

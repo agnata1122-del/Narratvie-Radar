@@ -25,6 +25,8 @@
 | `interest_profiles` | 관심사와 자동 탐색 설정 (root, depth, 일일 신규 노드 예산, 최소 독립 근거 수, 도메인 팩 `domain`) |
 | `source_adapters` | 소스별 상태(`not_authorized / test_mode / live / paused / blocked / stopped`)와 `live_enabled` |
 | `pipeline_runs` | 수집·분석 실행 단위. mode(`live / retrospective`), model·prompt·schema·code 버전 |
+| `control_flags` | 시스템 전체 스위치. `emergency_stop`이 켜져 있으면 모든 발견·수집이 멈춘다 (D25) |
+| `site_policies` | 사이트(호스트)별 수집 허용 상태(`pending_review / allowed / denied / blocked`), 하루 상한, 연속 일시 오류 수, 차단 시각 (D25) |
 
 ### 원천 데이터
 
@@ -36,6 +38,8 @@
 | `document_metric_snapshots` | 관측 시각별 댓글·조회·추천 수. 문서 행에는 이 값을 두지 않는다 |
 | `derivation_groups` | 복사·전재된 글 묶음. 독립 근거를 셀 때 쓴다 |
 | `source_health` | 수집 상태 시계열. 관측 공백을 표시하는 데 쓴다 |
+| `discovered_urls` | 발견 공급자(GDELT 등)가 찾은 수집 후보. 정리한 URL이 유일하고, 찾은 탐색 루트·검색식·우선순위·상태(`new / fetched / skipped / blocked / failed`)를 둔다 (D25) |
+| `fetch_logs` | 범용 수집기의 요청 결과 기록(`ok / blocked / transient / skipped / rejected`) (D25) |
 
 ### 분류·지식 그래프
 

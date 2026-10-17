@@ -37,6 +37,8 @@ PREFIXES = frozenset(
         "nca",  # narrative_claims
         "pnd",  # profile_nodes
         "mnt",  # node_mentions
+        "cnd",  # discovered_urls (수집 후보)
+        "flg",  # fetch_logs
     }
 )
 

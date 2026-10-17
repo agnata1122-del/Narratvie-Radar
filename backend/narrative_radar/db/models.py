@@ -18,6 +18,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from narrative_radar.db.types import UTCDateTime, str_enum
 from narrative_radar.schemas.enums import (
     AliasOrigin,
+    CandidateStatus,
     ClassificationStatus,
     ContentAccessStatus,
     EdgeStatus,
@@ -25,6 +26,7 @@ from narrative_radar.schemas.enums import (
     EventCause,
     EventType,
     EvidenceStatus,
+    FetchOutcome,
     IngestMode,
     NarrativeRole,
     NarrativeState,
@@ -36,6 +38,7 @@ from narrative_radar.schemas.enums import (
     RunKind,
     RunMode,
     RunStatus,
+    SitePolicyStatus,
     SourceAccessStatus,
     SourceHealthStatus,
     SourceKind,
@@ -554,3 +557,77 @@ class ClassificationFeedback(Base):
     prompt_version: Mapped[str | None] = mapped_column(sa.String(64))
     schema_version: Mapped[str | None] = mapped_column(sa.String(64))
     created_at: Mapped[datetime]
+
+
+# --- 발견·범용 수집 (DECISIONS D24·D25) ----------------------------------------------------
+
+
+class SitePolicy(Base):
+    """사이트(도메인)별 수집 허용 상태와 차단기. 새 사이트는 검토 대기로 시작한다."""
+
+    __tablename__ = "site_policies"
+
+    domain: Mapped[str] = mapped_column(sa.String(255), primary_key=True)
+    status: Mapped[SitePolicyStatus] = mapped_column(str_enum(SitePolicyStatus))
+    reason: Mapped[str | None] = mapped_column(sa.String(500))
+    decided_by: Mapped[str] = mapped_column(sa.String(32))  # owner / breaker / denylist / discovery
+    # 사이트별 하루 수집 상한 (출처별 수집량 제한)
+    daily_limit: Mapped[int] = mapped_column(default=20)
+    robots_checked_at: Mapped[datetime | None]
+    consecutive_transient: Mapped[int] = mapped_column(default=0)
+    blocked_at: Mapped[datetime | None]
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+
+class DiscoveredUrl(Base):
+    """발견 공급자(GDELT 등)가 찾은 URL. 실제로 가져오기 전의 수집 후보다."""
+
+    __tablename__ = "discovered_urls"
+
+    candidate_id: Mapped[str] = mapped_column(ID, primary_key=True)
+    canonical_url: Mapped[str] = mapped_column(sa.String(2000), unique=True)
+    url: Mapped[str] = mapped_column(sa.String(2000))
+    domain: Mapped[str] = mapped_column(sa.String(255), index=True)
+    title: Mapped[str] = mapped_column(sa.String(1000))
+    language: Mapped[str | None] = mapped_column(sa.String(32))
+    source_country: Mapped[str | None] = mapped_column(sa.String(64))
+    provider: Mapped[str] = mapped_column(sa.String(32))
+    term: Mapped[str] = mapped_column(sa.String(300))
+    # 어느 탐색 루트가 찾았나, 그 안에서 얼마나 먼저 가져올까 (작을수록 먼저)
+    profile_id: Mapped[str | None] = mapped_column(fk("interest_profiles.profile_id"), index=True)
+    priority: Mapped[int] = mapped_column(default=100)
+    provider_seen_at: Mapped[datetime | None]
+    discovered_at: Mapped[datetime]
+    status: Mapped[CandidateStatus] = mapped_column(str_enum(CandidateStatus), index=True)
+    status_reason: Mapped[str | None] = mapped_column(sa.String(500))
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_attempt_at: Mapped[datetime | None]
+    document_id: Mapped[str | None] = mapped_column(fk("documents.document_id"))
+    run_id: Mapped[str] = mapped_column(fk("pipeline_runs.run_id"))
+
+
+class FetchLog(Base):
+    """범용 수집기의 요청 기록 (수집 상태·오류 로그)."""
+
+    __tablename__ = "fetch_logs"
+
+    log_id: Mapped[str] = mapped_column(ID, primary_key=True)
+    domain: Mapped[str] = mapped_column(sa.String(255), index=True)
+    url: Mapped[str] = mapped_column(sa.String(2000))
+    outcome: Mapped[FetchOutcome] = mapped_column(str_enum(FetchOutcome))
+    status_code: Mapped[int | None]
+    detail: Mapped[str | None] = mapped_column(sa.String(500))
+    at: Mapped[datetime] = mapped_column(index=True)
+    run_id: Mapped[str | None] = mapped_column(fk("pipeline_runs.run_id"))
+
+
+class ControlFlag(Base):
+    """시스템 전체 스위치. emergency_stop이 켜져 있으면 모든 발견·수집이 멈춘다."""
+
+    __tablename__ = "control_flags"
+
+    key: Mapped[str] = mapped_column(sa.String(64), primary_key=True)
+    enabled: Mapped[bool]
+    reason: Mapped[str | None] = mapped_column(sa.String(500))
+    updated_at: Mapped[datetime]

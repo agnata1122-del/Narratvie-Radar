@@ -9,7 +9,14 @@ from narrative_radar.db.models import SourceAdapter
 from narrative_radar.db.seed import seed_defaults
 from narrative_radar.schemas.enums import SourceAccessStatus
 
-ALL_SOURCE_IDS = {"bluesky_jetstream", "hackernews", "dcinside_stockus", "naver_world_nvda"}
+ALL_SOURCE_IDS = {
+    "bluesky_jetstream",
+    "hackernews",
+    "gdelt",
+    "web",
+    "dcinside_stockus",
+    "naver_world_nvda",
+}
 
 
 def _client(db_path: Path, **kw: object) -> TestClient:

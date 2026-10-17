@@ -35,6 +35,21 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         display_name="Hacker News",
         base_url="https://hn.algolia.com",
     ),
+    # 주제 기반 광역 수집 (DECISIONS D24·D25)
+    SourceDefinition(
+        id="gdelt",
+        source="gdelt",
+        kind=SourceKind.NEWS,
+        display_name="GDELT (뉴스 발견)",
+        base_url="https://api.gdeltproject.org",
+    ),
+    SourceDefinition(
+        id="web",
+        source="web",
+        kind=SourceKind.WEB,
+        display_name="웹 (범용 수집)",
+        base_url="",
+    ),
     # 공식 경로가 없는 소스. 데이터 이용 문의 중 (DATA_POLICY 1–2)
     SourceDefinition(
         id="dcinside_stockus",

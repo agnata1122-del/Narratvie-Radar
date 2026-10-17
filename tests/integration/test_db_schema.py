@@ -37,7 +37,14 @@ from narrative_radar.schemas.enums import (
     SourceKind,
 )
 
-ALL_SOURCE_IDS = {"bluesky_jetstream", "hackernews", "dcinside_stockus", "naver_world_nvda"}
+ALL_SOURCE_IDS = {
+    "bluesky_jetstream",
+    "hackernews",
+    "gdelt",
+    "web",
+    "dcinside_stockus",
+    "naver_world_nvda",
+}
 
 KST = timezone(timedelta(hours=9))
 

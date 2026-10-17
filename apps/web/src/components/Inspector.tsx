@@ -10,8 +10,8 @@ import {
   NODE_STATUS_LABEL,
   NODE_TYPE_LABEL,
   RELATION_LABEL,
-  SOURCE_LABEL,
   label,
+  sourceName,
 } from '../lib/labels'
 import { Markdown } from '../lib/markdown'
 import { formatTime } from '../lib/time'
@@ -285,7 +285,7 @@ function EdgeInspector({ id, asOf, frames, frameIndex, onSelect }: Omit<Props, '
               <li key={ev.document_id} className="nr-rise relative" style={{ animationDelay: `${Math.min(i * 40, 320)}ms` }}>
                 <span className={`absolute top-1.5 -left-[19.5px] size-2 rounded-full ring-2 ring-nr-surface ${ev.deleted ? 'bg-nr-border-strong' : 'bg-nr-text-2'}`} />
                 <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-nr-muted">
-                  <span className="font-medium text-nr-text-2">{label(SOURCE_LABEL, ev.source)}</span>
+                  <span className="font-medium text-nr-text-2">{sourceName(ev.source, ev.url)}</span>
                   <span className="tabular-nums">{formatTime(ev.published_at)}</span>
                   {ev.evidence_status && <span>· {label(EVIDENCE_STATUS_LABEL, ev.evidence_status)}</span>}
                 </div>
