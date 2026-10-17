@@ -60,3 +60,53 @@ def test_cli_refuses_to_export_into_the_public_code_repo(
         assert not (code_repo / "data" / "snap").exists()
     finally:
         get_settings.cache_clear()
+
+
+def _put_text(url, text):
+    """확인용: 아무 문자열이나 DB에 넣는다 (긴급 중단 사유 칸)."""
+    engine = make_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "INSERT INTO control_flags (key, enabled, reason, updated_at) "
+                "VALUES ('probe', 0, :r, '2026-10-16T03:00:00+00:00')"
+            ),
+            {"r": text},
+        )
+    engine.dispose()
+
+
+def test_export_refuses_when_a_secret_value_is_in_the_database(db_url, tmp_path):
+    salt = "example-salt-value-0123456789abcdef"  # 형식 확인용 예시 값
+    _put_text(db_url, f"oops {salt}")
+    src = Path(db_url.removeprefix("sqlite:///"))
+    out = tmp_path / "snap"
+    with pytest.raises(SnapshotError, match=r"value of \$NR_AUTHOR_HASH_SALT") as err:
+        export_snapshot(
+            src, out, datetime_now(), env={"NR_AUTHOR_HASH_SALT": salt, "HOME": "/root"}
+        )
+    assert salt not in str(err.value)  # 값은 보고하지 않는다
+    assert not out.exists()  # 아무것도 쓰지 않았다
+
+
+def test_export_refuses_known_credential_formats(db_url, tmp_path):
+    _put_text(db_url, "token ghp_" + "A" * 36)
+    src = Path(db_url.removeprefix("sqlite:///"))
+    with pytest.raises(SnapshotError, match="GitHub token"):
+        export_snapshot(src, tmp_path / "snap", datetime_now(), env={})
+
+
+def test_clean_export_records_the_secret_check(db_url, tmp_path):
+    import json
+
+    src = Path(db_url.removeprefix("sqlite:///"))
+    out = tmp_path / "snap"
+    export_snapshot(src, out, datetime_now(), env={"GH_TOKEN": "x" * 40, "PATH": "/usr/bin"})
+    check = json.loads((out / "manifest.json").read_text())["secret_check"]
+    assert check["result"] == "clean" and check["env_values_checked"] == 1
+
+
+def datetime_now():
+    from datetime import UTC, datetime
+
+    return datetime(2026, 10, 16, 3, 0, tzinfo=UTC)

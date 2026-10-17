@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone --depth 1 https://github.com/agnata1122-del/narratvie-radar-data /home/user/narratvie-radar-data)",
+      "Bash(uv run nr data import /home/user/narratvie-radar-data/snapshot)",
+      "Bash(uv run nr data export /home/user/narratvie-radar-data/snapshot)",
+      "Bash(git -C /home/user/narratvie-radar-data add snapshot)",
+      "Bash(git -C /home/user/narratvie-radar-data commit -m *)",
+      "Bash(git -C /home/user/narratvie-radar-data pull --rebase origin main)",
+      "Bash(git -C /home/user/narratvie-radar-data push origin main)"
+    ]
+  }
+}

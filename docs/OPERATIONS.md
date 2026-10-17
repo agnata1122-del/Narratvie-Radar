@@ -24,8 +24,8 @@ NR_REVISIT_OFFSETS_MINUTES='[180, 360, 1440]'   # 지표 재방문: 3시간·6�
 
 ```bash
 # 0. 데이터 복원: 비공개 데이터 저장소를 받아 DB로 푼다 (해시·행 수 확인 후 마이그레이션)
-git clone https://github.com/agnata1122-del/narratvie-radar-data ../narratvie-radar-data
-uv run nr data import ../narratvie-radar-data/snapshot   # 처음이라 스냅숏이 없으면 `uv run nr db init`
+git clone --depth 1 https://github.com/agnata1122-del/narratvie-radar-data /home/user/narratvie-radar-data
+uv run nr data import /home/user/narratvie-radar-data/snapshot   # 스냅숏이 없으면 `uv run nr db init`
 
 # 1. 수집
 uv run nr collect hackernews --max-cycles 1 --lookback-minutes 240
@@ -52,8 +52,11 @@ uv run nr sources list
 uv run nr sources report --hours 6
 
 # 5. 데이터 저장: 압축·분할한 스냅숏을 비공개 데이터 저장소에 올린다
-uv run nr data export ../narratvie-radar-data/snapshot
-git -C ../narratvie-radar-data add -A && git -C ../narratvie-radar-data commit -m "snapshot" && git -C ../narratvie-radar-data push
+#    내보내기 전에 비밀값 검사를 한다(환경의 salt·토큰 값, 알려진 자격 증명 형식). 걸리면 아무것도 쓰지 않는다.
+uv run nr data export /home/user/narratvie-radar-data/snapshot
+git -C /home/user/narratvie-radar-data add snapshot
+git -C /home/user/narratvie-radar-data commit -m "snapshot: <UTC 시각>"
+git -C /home/user/narratvie-radar-data push origin main   # 거절되면 pull --rebase origin main 후 다시
 ```
 
 사이트 검토: 이용 조건과 robots.txt를 확인한 뒤 `nr sites allow <사이트> --reason "..."`(하루 상한은 `--daily-limit`). 차단된 사이트는 `nr sites logs <사이트>`로 원인을 보고, 문제가 풀렸다고 판단되면 `nr sites reset` → `allow` 순서로 다시 켠다. 자동으로 다시 켜지지 않는다.
@@ -61,6 +64,10 @@ git -C ../narratvie-radar-data add -A && git -C ../narratvie-radar-data commit -
 모든 발견·수집을 바로 멈춰야 하면 `uv run nr emergency stop --reason "..."`(풀 때는 `resume`).
 
 수집기가 멈추면(`blocked` / `stopped`) 그 주기는 나머지 단계만 진행하고, 원인을 기록해 소유자에게 알린다. 다음 주기에 자동으로 다시 켜지 않는다(DATA_POLICY 5).
+
+## 데이터 저장 권한
+
+예약 실행이 확인 없이 쓸 수 있는 명령은 `.claude/settings.json`에 적은 일곱 개뿐이다. 비공개 데이터 저장소의 clone, 그 저장소로 스냅숏 내보내기·가져오기, 그 저장소에 대한 add·commit·pull·push만 허용한다. 다른 곳으로 보내는 동작은 계속 확인을 거친다(D29).
 
 ## 분류하는 세션이 지킬 것
 
