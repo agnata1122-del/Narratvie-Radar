@@ -18,13 +18,19 @@ const palette: Palette = {
   surface: '#ffffff',
 }
 
-describe('layout', () => {
-  it('is deterministic and centred on the root', () => {
+describe('radial tree layout', () => {
+  it('puts the root at the centre and each depth on its own ring, deterministically', () => {
     const a = computeLayout(frames, 'nod_nv')
-    const b = computeLayout(frames, 'nod_nv')
-    expect(a).toEqual(b)
-    expect(a.nod_nv).toEqual({ x: 0, y: 0 })
-    expect(Object.keys(a).sort()).toEqual(['nod_hbm', 'nod_nv', 'nod_skh'])
+    expect(a).toEqual(computeLayout(frames, 'nod_nv'))
+    const r = (id: string) => Math.hypot(a.positions[id].x, a.positions[id].y)
+    expect(a.positions.nod_nv).toEqual({ x: 0, y: 0 })
+    expect(r('nod_hbm')).toBeCloseTo(1, 0)
+    expect(r('nod_skh')).toBeGreaterThan(1.8)
+    expect(a.rings).toEqual([1, 2])
+  })
+  it('re-centres on whichever node becomes the root (Focus Pivot)', () => {
+    const b = computeLayout(frames, 'nod_hbm')
+    expect(b.positions.nod_hbm).toEqual({ x: 0, y: 0 })
   })
 })
 

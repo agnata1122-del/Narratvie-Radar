@@ -49,6 +49,12 @@ export type GraphViewProps = {
   transitionMs: number
   /** 테마가 바뀌면 캔버스 색을 다시 읽는다 */
   theme: string
+  /** 루트에서의 깊이 고리 (레이아웃 좌표 반지름). 1단계, 2단계… */
+  rings?: number[]
+  /** 노드를 두 번 누르면 그 노드에서 파고든다 (Focus Pivot) */
+  onPivot?: (nodeId: string) => void
+  /** 파고들기 직전에 카메라가 그 노드로 다가간다 */
+  focus?: { nodeId: string; nonce: number } | null
 }
 
 type Vis = { size: number; color: RGBA }
@@ -82,6 +88,8 @@ export default function GraphView(props: GraphViewProps) {
   const edgeTw = useRef(new Map<string, Tween>())
   const pulses = useRef(new Map<string, number>())
   const rings = useRef<{ root: string | null; selected: string | null; breathing: string[] }>({ root: null, selected: null, breathing: [] })
+  const depthRings = useRef<number[]>(props.rings ?? [])
+  const onPivot = useRef(props.onPivot)
   const hoverRef = useRef<string | null>(null)
   const raf = useRef<number | null>(null)
   const firstSync = useRef(true)
@@ -92,7 +100,10 @@ export default function GraphView(props: GraphViewProps) {
   const onSelect = useRef(props.onSelect)
   useEffect(() => {
     onSelect.current = props.onSelect
-  }, [props.onSelect])
+    onPivot.current = props.onPivot
+    depthRings.current = props.rings ?? []
+    draw.current(performance.now())
+  }, [props.onSelect, props.onPivot, props.rings])
 
   const { frames, positions, theme } = props
 
@@ -179,6 +190,11 @@ export default function GraphView(props: GraphViewProps) {
     s.on('clickNode', ({ node }) => onSelect.current({ kind: 'node', id: node }))
     s.on('clickEdge', ({ edge }) => onSelect.current({ kind: 'edge', id: edge }))
     s.on('clickStage', () => onSelect.current(null))
+    s.on('doubleClickNode', (e) => {
+      if (!onPivot.current) return
+      e.preventSigmaDefault()
+      onPivot.current(e.node)
+    })
     s.on('enterNode', ({ node }) => {
       hoverRef.current = node
       setHover(node)
@@ -222,6 +238,26 @@ export default function GraphView(props: GraphViewProps) {
         ctx.stroke()
       }
       const { root, selected, breathing } = rings.current
+      // 깊이 고리: 루트에서 1단계, 2단계… (방사형 트리의 눈금)
+      if (root && g.hasNode(root) && depthRings.current.length) {
+        const rootPos = { x: g.getNodeAttribute(root, 'x'), y: g.getNodeAttribute(root, 'y') }
+        const c = s.graphToViewport(rootPos)
+        ctx.font = "500 10px 'Pretendard Variable', Pretendard, system-ui, sans-serif"
+        ctx.textAlign = 'center'
+        for (const r of depthRings.current) {
+          const edge = s.graphToViewport({ x: rootPos.x + r, y: rootPos.y })
+          const radius = Math.hypot(edge.x - c.x, edge.y - c.y)
+          ctx.beginPath()
+          ctx.arc(c.x, c.y, radius, 0, Math.PI * 2)
+          ctx.lineWidth = 1
+          ctx.setLineDash([])
+          ctx.strokeStyle = toCss([focus[0], focus[1], focus[2], 0.07])
+          ctx.stroke()
+          // 첫 가지가 12시에서 시작하므로 이름표는 비스듬히 아래(4시 반)에 둔다
+          ctx.fillStyle = toCss([focus[0], focus[1], focus[2], 0.32])
+          ctx.fillText(`${r}단계`, c.x + radius * Math.SQRT1_2 + 14, c.y + radius * Math.SQRT1_2 + 10)
+        }
+      }
       if (root) {
         const a = ringAt(root)
         if (a) stroke(a.x, a.y, a.r + 4, 1, [focus[0], focus[1], focus[2], 0.22])
@@ -416,6 +452,16 @@ export default function GraphView(props: GraphViewProps) {
       { duration: prefersReducedMotion() ? 0 : 700, easing: easeInOutCubic },
     )
   }, [highlight])
+
+  // 파고들기 직전: 고른 노드로 카메라가 다가간다
+  const { focus } = props
+  useEffect(() => {
+    const s = sigma.current
+    if (!s || !focus) return
+    const d = s.getNodeDisplayData(focus.nodeId)
+    if (!d) return
+    s.getCamera().animate({ x: d.x, y: d.y, ratio: 0.32 }, { duration: prefersReducedMotion() ? 0 : 520, easing: easeInOutCubic })
+  }, [focus])
 
   const zoom = (factor: number | null) => {
     const s = sigma.current

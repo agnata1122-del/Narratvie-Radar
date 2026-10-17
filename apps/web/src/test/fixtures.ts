@@ -12,9 +12,57 @@ export const health: Health = {
   sources: [{ id: 'hackernews', display_name: 'Hacker News', access_status: 'not_authorized', live_enabled: false }],
 }
 
-export function overview(nodes = 3): Overview {
+const ROOT_SUMMARY = {
+  profile_id: 'prf_1',
+  name: 'NVIDIA Research',
+  root_label: 'NVIDIA',
+  root_node_id: 'nod_nv',
+  root_type: 'organization',
+  parent_profile_id: null,
+  origin: 'registered' as const,
+  created_at: T0,
+}
+
+export const BRANCH_SUMMARY = {
+  profile_id: 'prf_hbm',
+  name: 'HBM',
+  root_label: 'HBM',
+  root_node_id: 'nod_hbm',
+  root_type: 'technology',
+  parent_profile_id: 'prf_1',
+  origin: 'branch' as const,
+  created_at: T1,
+}
+
+/** 가지(HBM)의 overview: 경로 NVIDIA › HBM */
+export function branchOverview(): Overview {
+  const base = overview()
   return {
+    ...base,
     profile: {
+      ...base.profile,
+      profile_id: 'prf_hbm',
+      name: 'HBM',
+      root_key: 'TECH:hbm',
+      root_label: 'HBM',
+      root_node_id: 'nod_hbm',
+      origin: 'branch',
+      created_at: T1,
+      parent_profile_id: 'prf_1',
+    },
+    lineage: [ROOT_SUMMARY, BRANCH_SUMMARY],
+    children: [],
+  }
+}
+
+export function overview(nodes = 3, children: (typeof BRANCH_SUMMARY)[] = []): Overview {
+  return {
+    lineage: [ROOT_SUMMARY],
+    children,
+    profile: {
+      origin: 'registered',
+      created_at: T0,
+      parent_profile_id: null,
       profile_id: 'prf_1',
       name: 'NVIDIA',
       domain: { id: 'finance', name: '금융·투자', lenses: ['price_overlay', 'shadow_trading'] },
@@ -43,18 +91,18 @@ export const frames: Frames = {
     edg_2: { source: 'nod_skh', target: 'nod_hbm', relation: 'SUPPLIES_TO' },
   },
   frames: [
-    { t: T0, nodes: { nod_nv: [0, 'active', 'root', 0] }, edges: {} },
+    { t: T0, nodes: { nod_nv: [0, 'active', 'root', 0, 0] }, edges: {} },
     {
       t: T1,
-      nodes: { nod_nv: [1, 'active', 'root', 2], nod_hbm: [1, 'active', 'admitted', 2] },
+      nodes: { nod_nv: [1, 'active', 'root', 2, 0], nod_hbm: [1, 'active', 'admitted', 2, 1] },
       edges: { edg_1: [2, 'confirmed', 2] },
     },
     {
       t: T2,
       nodes: {
-        nod_nv: [1.5, 'active', 'root', 4],
-        nod_hbm: [1.2, 'active', 'admitted', 4],
-        nod_skh: [0.8, 'active', 'admitted', 2],
+        nod_nv: [1.5, 'active', 'root', 4, 0],
+        nod_hbm: [1.2, 'active', 'admitted', 4, 1],
+        nod_skh: [0.8, 'active', 'admitted', 2, 2],
       },
       edges: { edg_1: [1.8, 'confirmed', 2], edg_2: [2, 'confirmed', 2] },
     },

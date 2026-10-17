@@ -18,6 +18,8 @@ type Props = {
   healthError: boolean
   theme: ThemeMode
   onTheme: (mode: ThemeMode) => void
+  /** 경로나 하위 가지를 누르면 그 관심사로 이동한다. null은 최상위 관심사 */
+  onOpenProfile: (profileId: string | null) => void
 }
 
 const NEXT_THEME: Record<ThemeMode, ThemeMode> = { system: 'light', light: 'dark', dark: 'system' }
@@ -63,7 +65,58 @@ function CollectionStatus({ sources }: { sources: SourceStatus[] }) {
   )
 }
 
-export default function Header({ overview, health, healthPending, healthError, theme, onTheme }: Props) {
+/** 루트 관심사부터 지금 가지까지: NVIDIA › HBM › SK hynix. 앞쪽은 눌러서 돌아갈 수 있다. */
+function Lineage({ overview, onOpenProfile }: { overview: Overview; onOpenProfile: Props['onOpenProfile'] }) {
+  const path = overview.lineage.length ? overview.lineage : []
+  const kids = overview.children
+  return (
+    <nav aria-label="탐색 경로" className="flex min-w-0 flex-wrap items-center gap-1 text-xs">
+      {path.map((x, i) => {
+        const current = i === path.length - 1
+        return (
+          <span key={x.profile_id} className="flex items-center gap-1">
+            {i > 0 && <span className="text-nr-muted" aria-hidden="true">›</span>}
+            {current ? (
+              <span aria-current="page" className="nr-fade rounded-md bg-nr-text px-2 py-0.5 text-[12px] font-semibold text-nr-surface">
+                {x.root_label}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenProfile(i === 0 && !x.parent_profile_id ? null : x.profile_id)}
+                className="rounded-md px-1.5 py-0.5 font-medium text-nr-text-2 transition-colors hover:bg-nr-surface-2 hover:text-nr-text"
+              >
+                {x.root_label}
+              </button>
+            )}
+          </span>
+        )
+      })}
+      {kids.length > 0 && (
+        <details className="group relative">
+          <summary className="ml-1 cursor-pointer list-none rounded-md px-1.5 py-0.5 text-[11px] font-medium text-nr-muted ring-1 ring-nr-border select-none ring-inset hover:text-nr-text">
+            가지 {kids.length} ▾
+          </summary>
+          <div className="nr-rise absolute left-0 z-30 mt-2 w-56 rounded-xl border border-nr-border bg-nr-surface p-1.5 shadow-nr">
+            <p className="px-2 pt-1 pb-1.5 text-[11px] text-nr-muted">여기서 갈라진 가지</p>
+            {kids.map((k) => (
+              <button
+                key={k.profile_id}
+                type="button"
+                onClick={() => onOpenProfile(k.profile_id)}
+                className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-nr-text-2 hover:bg-nr-surface-2 hover:text-nr-text"
+              >
+                {k.root_label}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+    </nav>
+  )
+}
+
+export default function Header({ overview, health, healthPending, healthError, theme, onTheme, onOpenProfile }: Props) {
   const p = overview?.profile
   const live = health?.sources.some((s) => s.access_status === 'live') ?? false
   const ThemeIcon = theme === 'dark' ? MoonIcon : theme === 'light' ? SunIcon : SystemIcon
@@ -75,8 +128,11 @@ export default function Header({ overview, health, healthPending, healthError, t
       </div>
       <span className="hidden h-4 w-px bg-nr-border-strong sm:block" aria-hidden="true" />
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span className="text-nr-muted">관심사</span>
-        <span className="rounded-md bg-nr-text px-2 py-0.5 text-[12px] font-semibold text-nr-surface">{p?.root_label ?? p?.name ?? '—'}</span>
+        {overview && overview.lineage.length > 0 ? (
+          <Lineage overview={overview} onOpenProfile={onOpenProfile} />
+        ) : (
+          <span className="rounded-md bg-nr-text px-2 py-0.5 text-[12px] font-semibold text-nr-surface">{p?.root_label ?? p?.name ?? '—'}</span>
+        )}
         {p && (
           <span className="rounded-md bg-nr-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-nr-text-2 ring-1 ring-nr-border ring-inset" title="도메인 팩: 키 규칙·분류 지침·소스를 정한다">
             {p.domain.name}

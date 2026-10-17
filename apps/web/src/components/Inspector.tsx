@@ -27,6 +27,13 @@ type Props = {
   frameIndex: number
   labelToId: Map<string, string>
   onSelect: (selection: Selection) => void
+  /** 지금 보는 관심사와 그 루트 */
+  profileId?: string | null
+  rootId?: string | null
+  /** 이 노드에서 파고들기 (Focus Pivot) */
+  onPivot?: (nodeId: string) => void
+  pivoting?: boolean
+  onOpenProfile?: (profileId: string) => void
 }
 
 function notKnownYet(error: unknown): boolean {
@@ -107,12 +114,37 @@ function Loading() {
   )
 }
 
-function NodeInspector({ id, asOf, frames, frameIndex, labelToId, onSelect }: Omit<Props, 'selection'> & { id: string }) {
+/** 이 노드를 새 루트로 트리를 다시 키운다. 이미 그 가지가 있으면 그리로 간다. */
+function PivotButton({ id, branchId, props }: { id: string; branchId: string | null | undefined; props: Omit<Props, 'selection'> }) {
+  if (!props.onPivot || id === props.rootId) {
+    return id === props.rootId ? <Chip tone="ink">지금 트리의 중심</Chip> : null
+  }
+  const existing = branchId && branchId !== props.profileId ? branchId : null
+  return (
+    <button
+      type="button"
+      disabled={props.pivoting}
+      onClick={() => (existing ? props.onOpenProfile?.(existing) : props.onPivot?.(id))}
+      className="group inline-flex items-center gap-1.5 rounded-full bg-nr-text px-3 py-1.5 text-xs font-semibold text-nr-surface shadow-nr transition-transform duration-[var(--nr-dur-2)] ease-nr-spring hover:scale-[1.03] active:scale-95 disabled:opacity-60"
+      title="이 노드를 중심으로 새 트리를 키운다 (그래프에서 노드를 두 번 눌러도 된다)"
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="2.2" />
+        <circle cx="8" cy="8" r="5.6" strokeOpacity="0.5" />
+        <path d="M8 1v2M8 13v2M1 8h2M13 8h2" />
+      </svg>
+      {props.pivoting ? '파고드는 중…' : existing ? '이 노드의 가지로 이동' : '여기서 파고들기'}
+    </button>
+  )
+}
+
+function NodeInspector(props: Omit<Props, 'selection'> & { id: string }) {
+  const { id, asOf, frames, frameIndex, labelToId, onSelect, profileId } = props
   const q = useQuery({
-    queryKey: ['node', id, asOf],
-    queryFn: ({ signal }) => api.node(id, asOf, signal),
+    queryKey: ['node', profileId ?? null, id, asOf],
+    queryFn: ({ signal }) => api.node(profileId ?? null, id, asOf, signal),
     retry: false,
-    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === id ? prev : undefined),
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[2] === id ? prev : undefined),
   })
   const meta = frames?.nodes[id]
   const present = frames?.frames[frameIndex]?.nodes[id] !== undefined
@@ -153,6 +185,9 @@ function NodeInspector({ id, asOf, frames, frameIndex, labelToId, onSelect }: Om
             {!present && <Chip tone="warn">지금 필터·시점에서 숨김</Chip>}
           </div>
           <h2 className="mt-1 text-lg leading-6 font-semibold tracking-tight break-keep text-nr-text">{node?.label ?? meta?.label ?? id}</h2>
+          <div className="mt-2">
+            <PivotButton id={id} branchId={q.data.branch_profile_id} props={props} />
+          </div>
         </div>
         {node && (
           <div className="grid grid-cols-3 gap-2">

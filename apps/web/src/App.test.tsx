@@ -23,14 +23,15 @@ function stubApi({ nodes = 3, failAll = false }: Routes = {}) {
   const calls: URL[] = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: string) => {
+    vi.fn(async (input: string, init?: RequestInit) => {
       const url = new URL(input, 'http://localhost')
       calls.push(url)
       if (failAll) return new Response('', { status: 502 })
       const path = url.pathname.replace(/^\/api/, '')
       const q = url.searchParams
       if (path === '/health') return Response.json(fx.health)
-      if (path === '/overview') return Response.json(fx.overview(nodes))
+      if (path === '/overview') return Response.json(q.get('profile') === 'prf_hbm' ? fx.branchOverview() : fx.overview(nodes))
+      if (path === '/profiles/branch' && init?.method === 'POST') return Response.json({ ...fx.BRANCH_SUMMARY, created: true })
       if (path === '/viewer/visit') return Response.json({ viewer_id: 'vwr_1', previous_seen_at: null })
       if (path === '/frames') return Response.json(fx.frames)
       if (path === '/events') return Response.json([{ t: fx.T1, type: 'NODE_CREATED', cause: 'observed_new', node_id: 'nod_hbm', edge_id: null }])
@@ -46,6 +47,10 @@ function stubApi({ nodes = 3, failAll = false }: Routes = {}) {
     }),
   )
   return calls
+}
+
+async function openChanges() {
+  fireEvent.click(await screen.findByRole('button', { name: /달라진 점/ }))
 }
 
 function renderApp() {
@@ -91,7 +96,7 @@ describe('App', () => {
   it('explains the empty state instead of drawing a fake graph', async () => {
     stubApi({ nodes: 0 })
     renderApp()
-    expect(await screen.findByText('아직 그려질 그래프가 없다')).toBeInTheDocument()
+    expect(await screen.findByText('아직 자라난 트리가 없다')).toBeInTheDocument()
     expect(screen.queryByTestId('graph')).not.toBeInTheDocument()
   })
 
@@ -99,6 +104,7 @@ describe('App', () => {
     stubApi()
     renderApp()
     expect(await screen.findByTestId('graph')).toHaveAttribute('data-frame', '2')
+    await openChanges()
     const fresh = await screen.findByRole('heading', { name: /새로 관측된 것/ })
     const list = within(fresh.parentElement!)
     expect(list.getByText('SK hynix')).toBeInTheDocument()
@@ -110,6 +116,7 @@ describe('App', () => {
   it('clicking a change opens the node wiki, and wiki links move to the linked node', async () => {
     stubApi()
     renderApp()
+    await openChanges()
     fireEvent.click(await screen.findByRole('button', { name: /새 대상.*SK hynix/ }))
     expect(await screen.findByRole('heading', { name: 'SK hynix', level: 2 })).toBeInTheDocument()
     expect(screen.getByText(/위키 v1/)).toBeInTheDocument()
@@ -122,6 +129,7 @@ describe('App', () => {
   it('moving the slider back changes the frame and the as-of time of every query', async () => {
     const calls = stubApi()
     renderApp()
+    await openChanges()
     fireEvent.click(await screen.findByRole('button', { name: /새 대상.*SK hynix/ }))
     await screen.findByRole('heading', { name: 'SK hynix', level: 2 })
     fireEvent.change(screen.getByRole('slider', { name: '재생 시점' }), { target: { value: '1' } })
@@ -141,5 +149,23 @@ describe('App', () => {
     expect(screen.getByText('“fixture excerpt”')).toBeInTheDocument()
     expect(screen.getByText(/작성자가 지운 글/)).toBeInTheDocument()
     expect(screen.getByText(/커뮤니티 의견 · 미검증/)).toBeInTheDocument()
+  })
+
+  it('Focus Pivot: digging into a node grows a new tree from it and shows the path', async () => {
+    const calls = stubApi()
+    renderApp()
+    await openChanges()
+    fireEvent.click(await screen.findByRole('button', { name: /새 대상.*SK hynix/ }))
+    // 루트가 아닌 노드에는 파고들기 버튼이 있다
+    fireEvent.click(await screen.findByRole('button', { name: '여기서 파고들기' }))
+    const nav = await screen.findByRole('navigation', { name: '탐색 경로' })
+    expect(await within(nav).findByText('HBM')).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'NVIDIA' })).toBeInTheDocument()
+    expect(window.location.search).toContain('p=prf_hbm')
+    // 새 가지의 트리·달라진 점을 그 가지 기준으로 다시 부른다
+    expect(calls.some((u) => u.pathname === '/api/frames' && u.searchParams.get('profile') === 'prf_hbm')).toBe(true)
+    // 경로의 앞쪽을 누르면 원래 트리로 돌아간다
+    fireEvent.click(within(nav).getByRole('button', { name: 'NVIDIA' }))
+    expect(window.location.search).not.toContain('p=')
   })
 })

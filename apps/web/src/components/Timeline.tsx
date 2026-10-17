@@ -23,6 +23,8 @@ export type TimelineProps = {
   previousSeenAt: string | null
   /** 재생 중 한 칸 넘어가는 시간. 재생 헤드가 이 시간 동안 미끄러진다. */
   stepMs: number
+  /** 지금 보는 가지가 생긴 시각. 그 전 구간은 공통 그래프로 되살린 재구성이다 */
+  bornAt?: string | null
 }
 
 const btn =
@@ -133,6 +135,25 @@ export default function Timeline(p: TimelineProps) {
                 )
               })}
             </div>
+            {p.bornAt && new Date(p.bornAt) > new Date(start) && (
+              <>
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 rounded-sm bg-nr-surface-2/80"
+                  style={{ width: `${positionIn(start, end, p.bornAt) * 100}%` }}
+                  title="가지가 생기기 전: 공통 그래프로 되살린 재구성"
+                />
+                <div className="pointer-events-none absolute inset-y-0" style={{ left: `${positionIn(start, end, p.bornAt) * 100}%` }}>
+                  <div className="h-full w-0.5 bg-nr-focus" />
+                  <span
+                    className={`absolute -top-0.5 rounded bg-nr-surface px-1 text-[10px] leading-3 font-semibold whitespace-nowrap text-nr-text ${
+                      positionIn(start, end, p.bornAt) > 0.85 ? 'right-1' : 'left-1'
+                    }`}
+                  >
+                    가지 생성
+                  </span>
+                </div>
+              </>
+            )}
             {p.previousSeenAt && new Date(p.previousSeenAt) > new Date(start) && (
               <div className="pointer-events-none absolute inset-y-0" style={{ left: `${positionIn(start, end, p.previousSeenAt) * 100}%` }}>
                 <div className="h-full w-px bg-nr-text-2" />
