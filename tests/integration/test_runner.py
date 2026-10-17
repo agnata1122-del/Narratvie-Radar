@@ -283,7 +283,6 @@ def test_reddit_cycle_backfills_then_resumes_with_overlap(session_factory, ctx, 
         "title": "Example NVIDIA thread",
         "selftext": "",
         "created_utc": int((NOW - timedelta(days=2)).timestamp()),
-        "is_self": True,
         "subreddit": "NVDA_Stock",
     }
 

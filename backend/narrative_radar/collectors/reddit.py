@@ -31,7 +31,7 @@ PAGE_SIZE = 100
 FULL_SUBREDDITS = ("NVDA_Stock",)
 KEYWORD_SUBREDDITS = ("wallstreetbets", "stocks")
 
-POST_FIELDS = "id,author,title,selftext,created_utc,score,num_comments,url,is_self,subreddit"
+POST_FIELDS = "id,author,title,selftext,created_utc,score,num_comments,url,subreddit"
 COMMENT_FIELDS = "id,author,body,created_utc,score,link_id,parent_id,subreddit"
 REMOVED = frozenset({"[deleted]", "[removed]"})
 
@@ -134,8 +134,9 @@ class RedditArcticCollector:
                 text = str(item.get("selftext") or "")
                 if text in REMOVED:
                     text = ""
-                if not item.get("is_self") and item.get("url"):
-                    text = "\n".join(p for p in (text, str(item["url"])) if p)
+                link = str(item.get("url") or "")
+                if link and f"/comments/{rid}" not in link:  # 링크 게시물이면 그 주소를 붙인다
+                    text = "\n".join(p for p in (text, link) if p)
                 external_id, parent, thread = f"t3_{rid}", None, f"t3_{rid}"
                 url = f"https://www.reddit.com/r/{sub}/comments/{rid}/"
                 metrics = MetricsIn(

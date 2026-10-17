@@ -33,7 +33,6 @@ POST = {
     "score": 10,
     "num_comments": 4,
     "url": "https://www.reddit.com/r/NVDA_Stock/comments/abc1/",
-    "is_self": True,
     "subreddit": "NVDA_Stock",
 }
 COMMENT = {
@@ -81,6 +80,8 @@ def test_post_and_comment_map_to_unverified_documents():
     assert post.ingest_mode == IngestMode.LIVE
     assert post.source_url == "https://www.reddit.com/r/NVDA_Stock/comments/abc1/"
     assert seen[0]["sort"] == ["asc"] and "title" not in seen[0]
+    assert post.body_text == "Example body about guidance"  # 자기 글 주소는 붙이지 않는다
+    assert "is_self" not in seen[0]["fields"][0]
 
     seen.clear()
     c = make([COMMENT], seen)
