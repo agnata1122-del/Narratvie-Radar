@@ -59,6 +59,15 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         base_url="https://wts-info-api.tossinvest.com",
         domains=("finance",),
     ),
+    # Reddit 보관본 (DECISIONS D31). Reddit 허락은 확인되지 않음: 원문은 unverified
+    SourceDefinition(
+        id="reddit_arctic",
+        source="reddit",
+        kind=SourceKind.COMMUNITY,
+        display_name="Reddit (Arctic Shift 보관본)",
+        base_url="https://arctic-shift.photon-reddit.com",
+        domains=("finance",),
+    ),
     # 공식 경로가 없는 소스. 데이터 이용 문의 중 (DATA_POLICY 1–2)
     SourceDefinition(
         id="dcinside_stockus",

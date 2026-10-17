@@ -137,6 +137,63 @@ def collect_hackernews_backfill(
         client.close()
 
 
+@collect_app.command("reddit")
+def collect_reddit(
+    days: int = typer.Option(1, min=1, max=3650, help="처음 실행할 때 거슬러 올라갈 날 수"),
+    max_requests: int = typer.Option(
+        200, min=1, help="질의 하나에 이번 실행에서 보낼 최대 요청 수. 넘으면 다음에 이어 받는다"
+    ),
+) -> None:
+    """Reddit 투자 서브레딧의 글·댓글을 Arctic Shift 보관본에서 받는다 (D31)."""
+    from datetime import timedelta
+
+    from narrative_radar.collectors.guard import CollectionBlocked
+    from narrative_radar.collectors.hackernews import minimal_terms
+    from narrative_radar.collectors.http import PoliteClient
+    from narrative_radar.collectors.reddit import RedditArcticCollector
+    from narrative_radar.ingest.runner import profile_terms, reddit_cycle
+    from narrative_radar.schemas.enums import RunKind
+
+    ctx = _context("reddit_arctic")
+    hasher = _require_allowed(ctx)
+    with ctx.sessions() as session:
+        terms = minimal_terms(
+            profile_terms(
+                session, ctx.clock.now(), limit=ctx.settings.max_hn_terms, ascii_only=True
+            )
+        )
+    client = PoliteClient(ctx.settings.user_agent, guard=ctx.guard())
+    collector = RedditArcticCollector(
+        client,
+        hasher,
+        ctx.clock,
+        terms,
+        late_threshold=timedelta(minutes=ctx.settings.backfill_after_minutes),
+    )
+    first_start = ctx.clock.now() - timedelta(days=days)
+    typer.echo(f"terms: {terms} queries={len(collector.queries())}")
+    try:
+        with ctx.run(RunKind.COLLECT, {"source": "reddit_arctic", "terms": terms}) as run_id:
+            r = reddit_cycle(
+                ctx,
+                collector,
+                run_id,
+                first_start,
+                max_requests_per_query=max_requests,
+                progress=lambda key, at, new: (
+                    typer.echo(f"  {key}: ~{at:%Y-%m-%d %H:%M} new={new}") if new else None
+                ),
+            )
+        typer.echo(
+            f"docs={r.documents} new={r.created} requests={r.requests} "
+            f"unfinished={len(r.unfinished)}"
+        )
+    except CollectionBlocked as e:
+        _stopped(e)
+    finally:
+        client.close()
+
+
 @collect_app.command("prices")
 def collect_prices_cmd(
     lookback_days: int | None = typer.Option(

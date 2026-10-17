@@ -28,7 +28,13 @@ FINANCE = DomainPack(
         NodeType.TOPIC: "산업은 INDUSTRY:semiconductors",
     },
     guideline=GUIDELINES / "finance.md",
-    sources=("bluesky_jetstream", "hackernews", "dcinside_stockus", "naver_world_nvda"),
+    sources=(
+        "bluesky_jetstream",
+        "hackernews",
+        "reddit_arctic",
+        "dcinside_stockus",
+        "naver_world_nvda",
+    ),
     lenses=("price_overlay", "shadow_trading"),
 )
 

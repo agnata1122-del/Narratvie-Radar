@@ -313,3 +313,21 @@ D24의 설계를 소유자가 다음과 같이 확정했다. 핵심은 대규모
 - 내보내기 전에 비밀값을 검사한다. 이름에 SALT·TOKEN·SECRET·PASSWORD·CREDENTIAL·API_KEY·PRIVATE_KEY가 들어간 환경 변수의 값(12자 이상)과, 알려진 자격 증명 형식(개인 키, GitHub·Anthropic·AWS·Slack 토큰)이 DB 사본 어디에도 없어야 한다. 하나라도 있으면 아무것도 쓰지 않고 종류만 보고한다. 결과는 manifest의 `secret_check`에 남는다.
 - `nr data export`는 공개 코드 저장소 안으로는 내보내지 않는다.
 
+
+## D30. 지금은 수집만 한다 (2026-10-17, 소유자 결정)
+
+첫 운영 날 개발·조사·분류에 든 비용에 비해 효용을 보여줄 근거가 아직 없다고 소유자가 판단했다.
+
+- 정기 실행은 **수집 전용**이다: 수집 → 점검 → 스냅숏 저장. 분류·그래프·위키·GDELT 발견은 하지 않는다. 정기 실행 모델은 Haiku다.
+- 과거 1년치를 먼저 쌓는다(HN `nr collect hackernews-backfill`, Reddit `nr collect reddit --days 365`). Bluesky·GDELT는 과거분을 키 없이 받을 수 없다.
+- 효용은 쌓인 데이터로 한 번에 판단한다. 전부 분류하지 않고 관련성 높은 글이나 표본만 분류한다(Haiku 또는 Jev 같은 결정 모델로 거르기 검토).
+- 관심사 트리에 MVP 사례 노드를 소유자가 직접 넣었다(`nr profile add`): HBM, SK하이닉스, 삼성전자, 마이크론(D27). 트리의 별칭이 HN·Bluesky·Reddit 검색어가 되고, 상장사는 시세 대상이 된다. 영문 검색어는 단어 단위로 맞춘다(envidia·summicron 잡음).
+
+## D31. Reddit은 Arctic Shift 보관본으로 받는다 (2026-10-17, 소유자 결정)
+
+Reddit 공식 Data API는 사전 승인제이고 2026-10-31부터 신규 신청을 받지 않는다는 보도가 있다. 소유자가 Reddit 글을 다시 모아 둔 Arctic Shift 공개 API를 쓰기로 했다.
+
+- **위험**: Reddit의 이용 허락은 확인되지 않는다. 비영리 연구 단계(D28)이고 기본은 꺼짐(`reddit_arctic`, `not_authorized`)이며, 켜는 것은 소유자가 `nr sources enable reddit_arctic --accept-data-policy`로 한다. 원문은 `unverified`로 저장해 내부 분석에만 쓰고, 화면에는 짧은 발췌와 원문 링크만 보여준다.
+- **범위**: r/NVDA_Stock은 전부, r/wallstreetbets·r/stocks는 트리 검색어가 들어간 글(제목)·댓글(본문)만. 지워진 글(`[deleted]`/`[removed]`)은 받지 않는다. 작성자는 해시만 저장한다.
+- **요청**: 정직한 User-Agent, 요청 간격 3초, 오류·차단이면 멈춘다(DATA_POLICY 5). 보관본은 늦게 채워지므로 실행마다 6시간 겹쳐 받는다.
+- 상업적 이용이나 외부 공개 전에는 다시 판단한다. Reddit 공식 경로가 생기면 그쪽으로 바꾼다.

@@ -4,7 +4,7 @@
 
 ## 시작 전에 소유자가 할 일
 
-1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 시세(D27)를 받으려면 `wts-info-api.tossinvest.com`도 추가한다. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
+1. **네트워크 허용**: 클라우드 환경 설정 → Network access → 허용 도메인에 `hn.algolia.com`, `hacker-news.firebaseio.com`, `jetstream2.us-east.bsky.network`, `public.api.bsky.app` 추가. 주제 기반 발견을 쓰려면 `api.gdeltproject.org`도 추가한다. 시세(D27)를 받으려면 `wts-info-api.tossinvest.com`도 추가한다. Reddit 보관본(D31)은 `arctic-shift.photon-reddit.com`. 범용 수집기가 가져올 사이트는 단계적으로 넓힌다(D25).
 2. **비밀값**: 같은 설정의 환경변수에 `NR_LIVE_COLLECTION_ENABLED=true`, `NR_AUTHOR_HASH_SALT=<무작위 64자>` 추가. salt는 한 번 정하면 바꾸지 않는다.
 3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소 `agnata1122-del/narratvie-radar-data`를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). `nr data export`는 이 코드 저장소 안으로는 내보내지 않는다.
 4. **예약 작업**: claude.ai 예약 작업 화면에서 만들고, 저장소는 코드 저장소와 데이터 저장소를 **둘 다** 고른다. 프롬프트는 [ROUTINE_PROMPT.md](ROUTINE_PROMPT.md)를 그대로 쓴다. Claude가 도구로 만든 예약 작업은 새 세션에 저장소를 붙이지 못한다. 그래서 2026-10-17 수동 실행은 데이터 저장소를 받지 못하고 준비 단계에서 멈췄다.
@@ -23,6 +23,8 @@ NR_REVISIT_OFFSETS_MINUTES='[180, 360, 1440]'   # 지표 재방문: 3시간·6�
 
 ## 한 주기
 
+지금은 **수집 전용**이다(D30): 0·1·4·5단계만 하고, 1단계에서도 `nr discover`는 하지 않는다. 분류·그래프·위키는 효용을 판단할 때 한 번에 한다.
+
 ```bash
 # 0. 데이터 복원: 비공개 데이터 저장소를 받아 DB로 푼다 (해시·행 수 확인 후 마이그레이션)
 git clone --depth 1 https://github.com/agnata1122-del/narratvie-radar-data /home/user/narratvie-radar-data
@@ -37,6 +39,8 @@ uv run nr discover gdelt           # GDELT로 수집 후보·헤드라인 등록
 uv run nr sites list --status pending_review   # 새로 발견된 사이트 (소유자가 검토)
 uv run nr collect web              # 허용된 사이트의 후보를 가져와 본문을 채운다
 uv run nr collect prices           # 트리 속 미국·한국 종목의 일봉 (토스증권 웹 시세, D27)
+uv run nr collect reddit           # Reddit 보관본 (D31, reddit_arctic이 live일 때)
+# 과거분은 한 번만: uv run nr collect hackernews-backfill --days 365 / uv run nr collect reddit --days 365
 
 # 2. 분류 (대기열이 빌 때까지 반복)
 uv run nr classify pending --limit 50

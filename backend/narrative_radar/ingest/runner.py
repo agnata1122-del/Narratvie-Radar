@@ -6,7 +6,7 @@ import json
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import sqlalchemy as sa
@@ -26,6 +26,7 @@ from narrative_radar.collectors.control import emergency_stop_reason
 from narrative_radar.collectors.gate import auto_stop, can_collect, get_adapter
 from narrative_radar.collectors.guard import BlockGuard, CollectionBlocked, TripKind
 from narrative_radar.collectors.hackernews import HackerNewsCollector
+from narrative_radar.collectors.reddit import RedditArcticCollector
 from narrative_radar.core.clock import Clock
 from narrative_radar.core.config import Settings
 from narrative_radar.db.models import (
@@ -371,6 +372,79 @@ def hackernews_backfill(
             documents_listed=report.documents,
             documents_fetched=report.created,
             note=json.dumps({"backfill_start": start.isoformat()}),
+        )
+    return report
+
+
+# --- Reddit (Arctic Shift) ---------------------------------------------------------------
+
+# 보관본은 늦게 채워진다. 지난번 마지막 시각보다 이만큼 앞에서부터 다시 받는다.
+REDDIT_OVERLAP = timedelta(hours=6)
+
+
+@dataclass
+class RedditReport:
+    documents: int = 0
+    created: int = 0
+    requests: int = 0
+    unfinished: list[str] = field(default_factory=list)  # 요청 상한에 걸려 다음에 이어 받을 질의
+
+
+def reddit_cycle(
+    ctx: RunContext,
+    collector: RedditArcticCollector,
+    run_id: str,
+    first_start: datetime,
+    max_requests_per_query: int = 200,
+    progress: Callable[[str, datetime, int], None] | None = None,
+) -> RedditReport:
+    """질의마다 지난번 위치부터 지금까지 받는다. 처음이면 first_start부터(과거분 백필)."""
+    window_start = ctx.clock.now()
+    report = RedditReport()
+    requests_before = collector.client.stats.requests
+    successes_before = collector.client.stats.successes
+    for query in collector.queries():
+        key = f"after:{query.key}"
+        raw = _get_cursor(ctx, key)
+        after = (
+            datetime.fromisoformat(raw) - REDDIT_OVERLAP if isinstance(raw, str) else first_start
+        )
+        before = ctx.clock.now()
+        for _ in range(max_requests_per_query):
+            chunk = collector.fetch(query, after, before)
+            created = 0
+            with ctx.sessions.begin() as session:
+                store = DocumentStore(session, run_id, collector.parser_version)
+                for doc in chunk.documents:
+                    created += store.save(doc, snapshot_if_existing=False).created
+                reached = chunk.newest or after
+                previous = datetime.fromisoformat(raw) if isinstance(raw, str) else None
+                if previous is None or reached > previous:
+                    _set_cursor(session, ctx, key, reached.isoformat())
+                    raw = reached.isoformat()
+            report.documents += len(chunk.documents)
+            report.created += created
+            if progress:
+                progress(query.key, reached, created)
+            if chunk.next_after is None:
+                break
+            after = chunk.next_after
+        else:
+            report.unfinished.append(query.key)
+    report.requests = collector.client.stats.requests - requests_before
+    with ctx.sessions.begin() as session:
+        record_health(
+            session,
+            ctx.clock,
+            ctx.source_adapter_id,
+            window_start,
+            ctx.clock.now(),
+            SourceHealthStatus.OK,
+            requests=report.requests,
+            successes=collector.client.stats.successes - successes_before,
+            documents_listed=report.documents,
+            documents_fetched=report.created,
+            note=json.dumps({"unfinished": report.unfinished}),
         )
     return report
 

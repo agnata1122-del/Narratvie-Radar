@@ -16,6 +16,7 @@ from narrative_radar.collectors.guard import CollectionBlocked
 from narrative_radar.collectors.hackernews import HackerNewsCollector
 from narrative_radar.collectors.http import PoliteClient
 from narrative_radar.collectors.rate_limit import MinIntervalLimiter
+from narrative_radar.collectors.reddit import RedditArcticCollector
 from narrative_radar.core.config import Settings
 from narrative_radar.db.models import (
     Document,
@@ -35,6 +36,7 @@ from narrative_radar.ingest.runner import (
     hackernews_backfill,
     hackernews_cycle,
     profile_terms,
+    reddit_cycle,
 )
 from narrative_radar.schemas.enums import (
     IngestMode,
@@ -52,7 +54,7 @@ SALT = "s" * 32
 def ctx(session_factory, clock):
     with session_factory.begin() as s:
         seed_defaults(s, clock)
-        for sid in ("hackernews", "bluesky_jetstream"):
+        for sid in ("hackernews", "bluesky_jetstream", "reddit_arctic"):
             set_status(s, sid, SourceAccessStatus.LIVE, "test", clock, live_enabled=True)
     settings = Settings(live_collection_enabled=True, author_hash_salt=SALT)
     return lambda sid: RunContext(settings, session_factory, clock, sid)
@@ -270,6 +272,46 @@ def test_backfill_saves_old_posts_resumes_and_skips_revisits(session_factory, ct
     # 다 받은 검색어는 다시 실행해도 요청하지 않는다
     with c.run(RunKind.BACKFILL, {}) as run_id:
         assert hackernews_backfill(c, collector, run_id, start).requests == 0
+
+
+def test_reddit_cycle_backfills_then_resumes_with_overlap(session_factory, ctx, clock):
+    c = ctx("reddit_arctic")
+    afters: list[int] = []
+    post = {
+        "id": "p1",
+        "author": "alice",
+        "title": "Example NVIDIA thread",
+        "selftext": "",
+        "created_utc": int((NOW - timedelta(days=2)).timestamp()),
+        "is_self": True,
+        "subreddit": "NVDA_Stock",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        q = request.url.params
+        afters.append(int(q["after"]))
+        full = q["subreddit"] == "NVDA_Stock" and request.url.path.endswith("/posts/search")
+        return httpx.Response(200, json={"data": [post] if full else []})
+
+    client = PoliteClient(
+        "NarrativeRadar/test",
+        limiter=MinIntervalLimiter(0),
+        guard=c.guard(),
+        transport=httpx.MockTransport(handler),
+    )
+    collector = RedditArcticCollector(client, AuthorHasher(SALT), clock, ["NVIDIA"])
+    start = NOW - timedelta(days=7)
+    with c.run(RunKind.COLLECT, {}) as run_id:
+        r = reddit_cycle(c, collector, run_id, start)
+    assert r.created == 1 and not r.unfinished
+    assert afters[0] == int(start.timestamp())
+    afters.clear()
+    with c.run(RunKind.COLLECT, {}) as run_id:
+        assert reddit_cycle(c, collector, run_id, start).created == 0
+    # 받은 마지막 글 시각에서 6시간 겹쳐 다시 묻는다
+    assert afters[0] == int((NOW - timedelta(days=2, hours=6)).timestamp())
 
 
 def test_report_summarizes_collection(session_factory, ctx, clock):
