@@ -176,3 +176,50 @@ def collect_bluesky_metrics(
         _stopped(e)
     finally:
         client.close()
+
+
+@collect_app.command("web")
+def collect_web_cmd(
+    limit: int | None = typer.Option(
+        None, min=1, help="가져올 페이지 수. 기본: NR_WEB_MAX_PAGES_PER_RUN"
+    ),
+) -> None:
+    """허용된 사이트의 수집 후보를 우선순위대로 가져와 본문을 채운다 (DECISIONS D25)."""
+    import fcntl
+
+    from narrative_radar.collectors.web import SafeWebFetcher, SiteIntervals
+    from narrative_radar.ingest.web import collect_web
+    from narrative_radar.schemas.enums import RunKind
+
+    ctx = _context("web")
+    _require_allowed(ctx)
+    settings = ctx.settings
+    # 범용 수집기는 한 번에 하나만 돈다 (동시 실행 제한)
+    lock_path = settings.db_path.parent / "web-collect.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            typer.echo("다른 범용 수집이 이미 돌고 있습니다.")
+            raise typer.Exit(code=1) from None
+        fetcher = SafeWebFetcher(
+            settings.user_agent,
+            SiteIntervals(settings.web_min_interval_seconds),
+            max_bytes=settings.web_max_bytes,
+            max_redirects=settings.web_max_redirects,
+        )
+        try:
+            with ctx.run(RunKind.COLLECT, {"source": "web"}) as run_id:
+                r = collect_web(ctx, fetcher, run_id, limit or settings.web_max_pages_per_run)
+        finally:
+            fetcher.close()
+    typer.echo(
+        f"attempted={r.attempted} fetched={r.fetched} upgraded={r.upgraded} created={r.created} "
+        f"headline_only={r.headline_only} transient={r.transient} rejected={r.rejected} "
+        f"skipped={r.skipped}"
+    )
+    for site in r.blocked_sites:
+        typer.echo(f"사이트 차단: {site} (`nr sites logs {site}`로 원인 확인)")
+    if r.stopped:
+        typer.echo(f"멈춤: {r.stopped}")

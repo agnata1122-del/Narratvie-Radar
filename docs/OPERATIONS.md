@@ -31,6 +31,8 @@ uv run nr collect bluesky --until-caught-up --max-minutes 30
 uv run nr collect bluesky-metrics
 uv run nr discover plan            # 이번에 검색할 노드·검색식 (요청 없음)
 uv run nr discover gdelt           # GDELT로 수집 후보·헤드라인 등록 (D25)
+uv run nr sites list --status pending_review   # 새로 발견된 사이트 (소유자가 검토)
+uv run nr collect web              # 허용된 사이트의 후보를 가져와 본문을 채운다
 
 # 2. 분류 (대기열이 빌 때까지 반복)
 uv run nr classify pending --limit 50
@@ -48,6 +50,8 @@ uv run nr sources report --hours 6
 
 # 5. 데이터 저장 (보관 저장소 준비 후)
 ```
+
+사이트 검토: 이용 조건과 robots.txt를 확인한 뒤 `nr sites allow <사이트> --reason "..."`(하루 상한은 `--daily-limit`). 차단된 사이트는 `nr sites logs <사이트>`로 원인을 보고, 문제가 풀렸다고 판단되면 `nr sites reset` → `allow` 순서로 다시 켠다. 자동으로 다시 켜지지 않는다.
 
 모든 발견·수집을 바로 멈춰야 하면 `uv run nr emergency stop --reason "..."`(풀 때는 `resume`).
 

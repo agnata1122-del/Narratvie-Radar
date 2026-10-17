@@ -53,6 +53,11 @@ uv run nr collect hackernews --loop         # HN 수집
 uv run nr collect bluesky                   # Bluesky 스트림 수집
 uv run nr collect bluesky-metrics --loop    # Bluesky 지표 재방문
 uv run nr sources report                    # 수집 현황 요약
+uv run nr discover gdelt                    # 주제(노드)로 GDELT 검색 → 수집 후보·헤드라인
+uv run nr sites list                        # 사이트별 허용 상태 (새 사이트는 검토 대기)
+uv run nr sites allow <사이트> --reason ... # 사이트 허용
+uv run nr collect web                       # 허용된 사이트에서 본문 가져오기 (사이트 단위 차단기)
+uv run nr emergency stop --reason ...       # 모든 발견·수집 긴급 중단
 uv run nr classify pending                  # 분류할 글 내보내기 (세션이 분류)
 uv run nr classify ingest <out.jsonl> --model <이름>   # 분류 결과 검증·저장
 uv run nr classify baseline                 # 규칙 기반 기준 분류
