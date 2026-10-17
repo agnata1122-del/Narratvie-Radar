@@ -234,6 +234,8 @@ def due_revisits(
             Document.source_adapter_id == source_adapter_id,
             Document.deleted_observed_at.is_(None),
             Document.observed_at >= horizon,
+            # 백필로 지금 받은 오래된 글은 재방문하지 않는다 (실시간 글의 재방문을 밀어낸다)
+            Document.published_at >= horizon,
         )
         .order_by(Document.observed_at)
     ).all()
@@ -314,6 +316,63 @@ def hackernews_cycle(ctx: RunContext, collector: HackerNewsCollector, run_id: st
             ),
         )
     return CycleReport(len(result.documents), created, len(revisits), deleted)
+
+
+@dataclass
+class BackfillReport:
+    documents: int = 0
+    created: int = 0
+    requests: int = 0
+
+
+def hackernews_backfill(
+    ctx: RunContext,
+    collector: HackerNewsCollector,
+    run_id: str,
+    start: datetime,
+    progress: Callable[[str, datetime, int], None] | None = None,
+) -> BackfillReport:
+    """start까지 거슬러 올라가며 과거 글을 받는다. 검색어마다 어디까지 받았는지 기억해 이어 받는다.
+
+    실시간 커서(since)는 건드리지 않는다. 받은 글은 늦게 본 글이므로 backfill로 저장된다.
+    """
+    window_start = ctx.clock.now()
+    report = BackfillReport()
+    requests_before = collector.client.stats.requests
+    successes_before = collector.client.stats.successes
+    for term in collector.terms:
+        key = f"backfill_until:{normalize_text(term)}"
+        raw = _get_cursor(ctx, key)
+        end = datetime.fromisoformat(raw) if isinstance(raw, str) else ctx.clock.now()
+        while end > start:
+            chunk = collector.backfill_chunk(term, start, end)
+            created = 0
+            with ctx.sessions.begin() as session:
+                store = DocumentStore(session, run_id, collector.parser_version)
+                for doc in chunk.documents:
+                    created += store.save(doc, snapshot_if_existing=False).created
+                end = chunk.next_end if chunk.next_end is not None else start
+                _set_cursor(session, ctx, key, max(end, start).isoformat())
+            report.documents += len(chunk.documents)
+            report.created += created
+            if progress:
+                progress(term, end, created)
+    report.requests = collector.client.stats.requests - requests_before
+    with ctx.sessions.begin() as session:
+        record_health(
+            session,
+            ctx.clock,
+            ctx.source_adapter_id,
+            window_start,
+            ctx.clock.now(),
+            SourceHealthStatus.OK,
+            requests=report.requests,
+            successes=collector.client.stats.successes - successes_before,
+            documents_listed=report.documents,
+            documents_fetched=report.created,
+            note=json.dumps({"backfill_start": start.isoformat()}),
+        )
+    return report
 
 
 def _apply_revisits(store: DocumentStore, source_adapter_id: str, revisits: list) -> int:  # type: ignore[type-arg]

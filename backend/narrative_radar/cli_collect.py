@@ -92,6 +92,51 @@ def collect_hackernews(
         client.close()
 
 
+@collect_app.command("hackernews-backfill")
+def collect_hackernews_backfill(
+    days: int = typer.Option(365, min=1, max=3650, help="며칠 전까지 거슬러 올라갈지"),
+) -> None:
+    """Hacker News의 과거 글·댓글을 받는다. 끊겨도 다시 실행하면 이어 받는다."""
+    from datetime import timedelta
+
+    from narrative_radar.collectors.guard import CollectionBlocked
+    from narrative_radar.collectors.hackernews import HackerNewsCollector
+    from narrative_radar.collectors.http import PoliteClient
+    from narrative_radar.ingest.runner import hackernews_backfill, profile_terms
+    from narrative_radar.schemas.enums import RunKind
+
+    ctx = _context("hackernews")
+    hasher = _require_allowed(ctx)
+    with ctx.sessions() as session:
+        terms = profile_terms(
+            session, ctx.clock.now(), limit=ctx.settings.max_hn_terms, ascii_only=True
+        )
+    client = PoliteClient(ctx.settings.user_agent, guard=ctx.guard())
+    collector = HackerNewsCollector(
+        client,
+        hasher,
+        ctx.clock,
+        terms,
+        late_threshold=timedelta(minutes=ctx.settings.backfill_after_minutes),
+    )
+    start = ctx.clock.now() - timedelta(days=days)
+    typer.echo(f"terms: {collector.terms} since {start:%Y-%m-%d}")
+    try:
+        with ctx.run(RunKind.BACKFILL, {"source": "hackernews", "days": days}) as run_id:
+            r = hackernews_backfill(
+                ctx,
+                collector,
+                run_id,
+                start,
+                progress=lambda term, end, new: typer.echo(f"  {term}: ~{end:%Y-%m-%d} new={new}"),
+            )
+        typer.echo(f"docs={r.documents} new={r.created} requests={r.requests}")
+    except CollectionBlocked as e:
+        _stopped(e)
+    finally:
+        client.close()
+
+
 @collect_app.command("prices")
 def collect_prices_cmd(
     lookback_days: int | None = typer.Option(

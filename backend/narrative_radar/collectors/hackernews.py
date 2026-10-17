@@ -6,6 +6,7 @@
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
@@ -29,6 +30,14 @@ PARSER_VERSION = "hackernews.v1"
 # 검색 색인이 늦게 반영되는 경우를 대비해 직전 폴링과 겹치게 요청한다. 중복은 저장 단계가 걸러낸다.
 OVERLAP = timedelta(minutes=10)
 MAX_PAGES_PER_QUERY = 5
+# 과거분 백필: Algolia가 한 질의에 주는 최대 건수. 다 차면 가장 오래된 시각 앞에서 다시 묻는다.
+BACKFILL_HITS = 1000
+
+
+@dataclass(frozen=True)
+class BackfillChunk:
+    documents: list[DocumentIn]
+    next_end: datetime | None  # 다음 질의의 끝 시각. None이면 이 검색어는 start까지 다 받았다
 
 
 class HackerNewsCollector:
@@ -85,6 +94,41 @@ class HackerNewsCollector:
                 if page + 1 >= int(self._require(body, "nbPages", int)):
                     break
         return PollResult(list(seen.values()), newest, queries)
+
+    def backfill_chunk(self, term: str, start: datetime, end: datetime) -> BackfillChunk:
+        """start < 게시 시각 < end 범위에서 최근 글부터 최대 BACKFILL_HITS건.
+
+        긴 기간을 넓게 찾으면 오타 허용·앞부분 일치로 엉뚱한 글이 많이 걸려 둘 다 끈다.
+        """
+        body = self._get_json(
+            SEARCH_URL,
+            {
+                "query": term,
+                "tags": "(story,comment)",
+                "numericFilters": (
+                    f"created_at_i>{int(start.timestamp())},created_at_i<{int(end.timestamp())}"
+                ),
+                "hitsPerPage": str(BACKFILL_HITS),
+                "typoTolerance": "false",
+                "queryType": "prefixNone",
+            },
+        )
+        hits = self._require(body, "hits", list)
+        observed_at = self.clock.now()
+        docs: list[DocumentIn] = []
+        oldest: int | None = None
+        for hit in hits:
+            created = hit.get("created_at_i")
+            if isinstance(created, int):
+                oldest = created if oldest is None else min(oldest, created)
+            doc = self._to_document(hit, observed_at)
+            if doc is not None:
+                docs.append(doc)
+        if len(hits) < BACKFILL_HITS or oldest is None:
+            return BackfillChunk(docs, None)
+        # 같은 초에 1000건이 몰려 있으면 1초 당겨 무한 반복을 막는다
+        next_end = min(datetime.fromtimestamp(oldest, tz=UTC), end - timedelta(seconds=1))
+        return BackfillChunk(docs, next_end)
 
     def revisit(self, external_id: str) -> Revisit:
         item = self._get_json(ITEM_URL.format(id=external_id), None, allow_null=True)

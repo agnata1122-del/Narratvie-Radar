@@ -32,6 +32,7 @@ from narrative_radar.ingest.runner import (
     RunContext,
     consume_bluesky,
     due_revisits,
+    hackernews_backfill,
     hackernews_cycle,
     profile_terms,
 )
@@ -251,6 +252,24 @@ def test_due_revisits_follow_offsets(session_factory, ctx, clock):
         assert due_revisits(s, "hackernews", clock.now() + timedelta(minutes=5)) == []
         assert due_revisits(s, "hackernews", clock.now() + timedelta(minutes=10)) == ["1"]
         assert due_revisits(s, "hackernews", clock.now() + timedelta(days=3)) == []
+
+
+def test_backfill_saves_old_posts_resumes_and_skips_revisits(session_factory, ctx, clock):
+    c = ctx("hackernews")
+    old = {**STORY, "objectID": "9", "created_at_i": int((NOW - timedelta(days=200)).timestamp())}
+    collector = hn_collector(c, hn_api([old]), clock)
+    start = NOW - timedelta(days=365)
+    with c.run(RunKind.BACKFILL, {}) as run_id:
+        r = hackernews_backfill(c, collector, run_id, start)
+    assert (r.documents, r.created) == (1, 1)
+    with session_factory() as s:
+        doc = s.scalar(sa.select(Document).where(Document.external_id == "9"))
+        assert doc.ingest_mode == IngestMode.BACKFILL
+        # 지금 받은 오래된 글은 재방문하지 않는다
+        assert due_revisits(s, "hackernews", clock.now() + timedelta(minutes=10)) == []
+    # 다 받은 검색어는 다시 실행해도 요청하지 않는다
+    with c.run(RunKind.BACKFILL, {}) as run_id:
+        assert hackernews_backfill(c, collector, run_id, start).requests == 0
 
 
 def test_report_summarizes_collection(session_factory, ctx, clock):

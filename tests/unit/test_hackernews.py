@@ -178,3 +178,29 @@ def test_terms_contained_in_other_terms_are_dropped():
         "NVIDIA",
         "NVDA",
     ]
+
+
+def test_backfill_chunk_walks_back_from_oldest_hit_when_page_is_full(monkeypatch):
+    monkeypatch.setattr("narrative_radar.collectors.hackernews.BACKFILL_HITS", 2)
+    seen: list[dict[str, list[str]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(parse_qs(request.url.query.decode()))
+        return httpx.Response(200, json={"hits": [STORY, COMMENT], "nbPages": 1})
+
+    collector, _ = make(handler)
+    start, end = NOW - timedelta(days=365), NOW
+    chunk = collector.backfill_chunk("nvidia", start, end)
+    assert [d.external_id for d in chunk.documents] == ["41000001", "41000002"]
+    assert all(d.ingest_mode == IngestMode.BACKFILL for d in chunk.documents[1:])
+    # 다음 질의는 가장 오래된 글(COMMENT) 앞에서 다시 시작한다
+    assert chunk.next_end == datetime.fromtimestamp(COMMENT["created_at_i"], tz=UTC)
+    q = seen[0]
+    assert q["numericFilters"] == [f"created_at_i>{_ts(start)},created_at_i<{_ts(end)}"]
+    assert q["typoTolerance"] == ["false"] and q["queryType"] == ["prefixNone"]
+
+
+def test_backfill_chunk_ends_when_page_is_not_full():
+    collector, _ = make(lambda r: httpx.Response(200, json={"hits": [STORY], "nbPages": 1}))
+    chunk = collector.backfill_chunk("nvidia", NOW - timedelta(days=30), NOW)
+    assert chunk.next_end is None
