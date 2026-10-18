@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 from websockets.exceptions import ConnectionClosedError
 
 from narrative_radar.collectors.author import AuthorHasher
-from narrative_radar.collectors.bluesky import JetstreamHandler, JetstreamStream
+from narrative_radar.collectors.bluesky import BlueskyMetrics, JetstreamHandler, JetstreamStream
 from narrative_radar.collectors.gate import set_status
 from narrative_radar.collectors.guard import CollectionBlocked
 from narrative_radar.collectors.hackernews import HackerNewsCollector
@@ -37,6 +37,7 @@ from narrative_radar.ingest.runner import (
     hackernews_cycle,
     profile_terms,
     reddit_cycle,
+    revisit_bluesky,
 )
 from narrative_radar.schemas.enums import (
     IngestMode,
@@ -54,7 +55,7 @@ SALT = "s" * 32
 def ctx(session_factory, clock):
     with session_factory.begin() as s:
         seed_defaults(s, clock)
-        for sid in ("hackernews", "bluesky_jetstream", "reddit_arctic"):
+        for sid in ("hackernews", "bluesky_jetstream", "bluesky_appview", "reddit_arctic"):
             set_status(s, sid, SourceAccessStatus.LIVE, "test", clock, live_enabled=True)
     settings = Settings(live_collection_enabled=True, author_hash_salt=SALT)
     return lambda sid: RunContext(settings, session_factory, clock, sid)
@@ -241,6 +242,78 @@ def test_bluesky_stream_saves_matches_applies_deletes_and_stops_on_drop(
         statuses = [h.status for h in s.scalars(sa.select(SourceHealth))]
         # 멈춘 순간의 기록(down)과, 멈춘 구간까지의 저장 기록(degraded)
         assert statuses == [SourceHealthStatus.DOWN, SourceHealthStatus.DEGRADED]
+
+
+def _saved_bluesky_post(session_factory, clock, rkey="m1"):
+    from narrative_radar.ingest.runs import start_run
+    from narrative_radar.ingest.store import DocumentStore
+    from narrative_radar.schemas.document import DocumentIn
+
+    with session_factory.begin() as s:
+        run_id = start_run(s, clock, RunKind.COLLECT).run_id
+        DocumentStore(s, run_id, "bluesky.v1").save(
+            DocumentIn(
+                source_adapter_id="bluesky_jetstream",
+                external_id=f"at://did:plc:example/app.bsky.feed.post/{rkey}",
+                source_url=f"https://bsky.app/profile/did:plc:example/post/{rkey}",
+                title="",
+                body_text="example NVIDIA post",
+                published_at=clock.now(),
+                observed_at=clock.now(),
+                content_access_status="permitted",
+                ingest_mode="live",
+            )
+        )
+
+
+def _metrics(c, handler):
+    client = PoliteClient(
+        "NarrativeRadar/test",
+        limiter=MinIntervalLimiter(0),
+        guard=c.guard(),
+        transport=httpx.MockTransport(handler),
+    )
+    return BlueskyMetrics(client, c.clock)
+
+
+def _appview(status, body=None):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        return httpx.Response(status, json=body or {"posts": []})
+
+    return handler
+
+
+def test_bluesky_metrics_failure_stops_only_the_appview_source(session_factory, ctx, clock):
+    _saved_bluesky_post(session_factory, clock)
+    clock.advance(timedelta(minutes=11))
+    c = ctx("bluesky_appview")
+    with pytest.raises(CollectionBlocked), c.run(RunKind.COLLECT, {}) as run_id:
+        revisit_bluesky(c, _metrics(c, _appview(504)), run_id)
+    with session_factory() as s:
+        assert s.get(SourceAdapter, "bluesky_appview").access_status == SourceAccessStatus.STOPPED
+        stream = s.get(SourceAdapter, "bluesky_jetstream")
+        # 지표 서버 오류는 스트림 수집을 멈추지 않는다
+        assert stream.access_status == SourceAccessStatus.LIVE and stream.live_enabled
+
+
+def test_bluesky_metrics_revisit_stream_posts_and_record_appview_health(
+    session_factory, ctx, clock
+):
+    _saved_bluesky_post(session_factory, clock)
+    clock.advance(timedelta(minutes=11))
+    c = ctx("bluesky_appview")
+    with c.run(RunKind.COLLECT, {}) as run_id:
+        r = revisit_bluesky(c, _metrics(c, _appview(200)), run_id)
+    assert (r.revisits, r.deleted) == (1, 1)  # 응답에 없는 글은 지워진 것으로 본다
+    with session_factory() as s:
+        doc = s.scalar(sa.select(Document))
+        assert doc.source_adapter_id == "bluesky_jetstream" and doc.deleted_observed_at
+        health = s.scalars(sa.select(SourceHealth)).all()
+        assert [(h.source_adapter_id, h.status) for h in health] == [
+            ("bluesky_appview", SourceHealthStatus.OK)
+        ]
 
 
 def test_due_revisits_follow_offsets(session_factory, ctx, clock):

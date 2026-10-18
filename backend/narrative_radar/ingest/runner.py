@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from narrative_radar.collectors.author import AuthorHasher
 from narrative_radar.collectors.bluesky import (
+    SOURCE_ADAPTER_ID as BLUESKY_DOCUMENTS,
+)
+from narrative_radar.collectors.bluesky import (
     BlueskyMetrics,
     DeleteAuthor,
     DeletePost,
@@ -544,13 +547,29 @@ def consume_bluesky(
 
 
 def revisit_bluesky(ctx: RunContext, metrics: BlueskyMetrics, run_id: str) -> CycleReport:
+    """스트림이 저장한 글(bluesky_jetstream)의 지표를 다시 읽는다. 중단·상태 기록은 ctx의 소스
+    (bluesky_appview)에만 남긴다: 지표 서버 오류가 스트림 수집을 멈추지 않게 한다."""
+    window_start = ctx.clock.now()
+    requests_before = metrics.client.stats.requests
+    successes_before = metrics.client.stats.successes
     with ctx.sessions() as session:
         due = due_revisits(
-            session, ctx.source_adapter_id, ctx.clock.now(), limit=100, offsets=ctx.revisit_offsets
+            session, BLUESKY_DOCUMENTS, ctx.clock.now(), limit=100, offsets=ctx.revisit_offsets
         )
     revisits = metrics.revisit_many(due)
     with ctx.sessions.begin() as session:
         deleted = _apply_revisits(
-            DocumentStore(session, run_id, "bluesky.v1"), ctx.source_adapter_id, revisits
+            DocumentStore(session, run_id, "bluesky.v1"), BLUESKY_DOCUMENTS, revisits
+        )
+        record_health(
+            session,
+            ctx.clock,
+            ctx.source_adapter_id,
+            window_start,
+            ctx.clock.now(),
+            SourceHealthStatus.OK,
+            requests=metrics.client.stats.requests - requests_before,
+            successes=metrics.client.stats.successes - successes_before,
+            note=json.dumps({"revisits": len(revisits), "deleted": deleted}),
         )
     return CycleReport(0, 0, len(revisits), deleted)

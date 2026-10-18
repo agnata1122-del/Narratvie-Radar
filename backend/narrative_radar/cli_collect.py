@@ -323,12 +323,13 @@ def collect_bluesky_metrics(
     from narrative_radar.ingest.runner import revisit_bluesky
     from narrative_radar.schemas.enums import RunKind
 
-    ctx = _context("bluesky_jetstream")
+    # 지표 서버(AppView)는 스트림과 따로 멈추고 따로 다시 켠다 (bluesky_appview)
+    ctx = _context("bluesky_appview")
     _require_allowed(ctx)
     client = PoliteClient(ctx.settings.user_agent, guard=ctx.guard())
     metrics = BlueskyMetrics(client, ctx.clock)
     try:
-        with ctx.run(RunKind.COLLECT, {"source": "bluesky_jetstream", "kind": "metrics"}) as run_id:
+        with ctx.run(RunKind.COLLECT, {"source": "bluesky_appview", "kind": "metrics"}) as run_id:
             while True:
                 r = revisit_bluesky(ctx, metrics, run_id)
                 typer.echo(

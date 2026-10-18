@@ -43,6 +43,7 @@ ALL_SOURCE_IDS = {
     "gdelt",
     "web",
     "toss_prices",
+    "bluesky_appview",
     "reddit_arctic",
     "dcinside_stockus",
     "naver_world_nvda",

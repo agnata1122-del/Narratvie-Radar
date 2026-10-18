@@ -28,6 +28,15 @@ DEFAULT_SOURCES: tuple[SourceDefinition, ...] = (
         display_name="Bluesky",
         base_url="wss://jetstream2.us-east.bsky.network",
     ),
+    # Bluesky 지표 재방문(공개 AppView). 스트림과 다른 서비스라 따로 멈추고 따로 다시 켠다.
+    # 글은 bluesky_jetstream으로 저장되고, 이 소스는 중단·상태 기록에만 쓴다.
+    SourceDefinition(
+        id="bluesky_appview",
+        source="bluesky",
+        kind=SourceKind.COMMUNITY,
+        display_name="Bluesky 지표 (AppView)",
+        base_url="https://public.api.bsky.app",
+    ),
     SourceDefinition(
         id="hackernews",
         source="hackernews",
