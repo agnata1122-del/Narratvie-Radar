@@ -72,7 +72,9 @@ def collect_prices(
     instruments: list[Instrument],
     lookback_days: int,
     report: PriceReport | None = None,
+    extend: bool = False,
 ) -> PriceReport:
+    """extend: 이미 받은 종목도 lookback_days까지 과거로 넓힌다 (실험 창 확장 등, 한 번만 쓴다)."""
     report = report or PriceReport()
     window_start = ctx.clock.now()
     requests_before = source.client.stats.requests
@@ -80,14 +82,18 @@ def collect_prices(
     today = ctx.clock.now().date()
     for inst in instruments:
         with ctx.sessions() as session:
-            last = session.scalar(
-                sa.select(sa.func.max(PriceBar.bar_date)).where(
+            first, last = session.execute(
+                sa.select(sa.func.min(PriceBar.bar_date), sa.func.max(PriceBar.bar_date)).where(
                     PriceBar.source_adapter_id == ctx.source_adapter_id,
                     PriceBar.canonical_key == inst.canonical_key,
                     PriceBar.interval == INTERVAL,
                 )
-            )
-        since = last - timedelta(days=REFRESH_DAYS) if last else today - timedelta(lookback_days)
+            ).one()
+        earliest = today - timedelta(lookback_days)
+        if last is None or (extend and first > earliest):
+            since = earliest
+        else:
+            since = last - timedelta(days=REFRESH_DAYS)
         bars = source.daily_bars(inst, since)
         with ctx.sessions.begin() as session:
             for bar in bars:

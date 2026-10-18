@@ -127,6 +127,42 @@ def test_tree_tickers_across_markets_are_collected_and_served_without_future_bar
     assert early_kr["bars"][-1][0] == "2026-10-16"  # 서울의 10-16은 UTC 10-16 15:00에 끝났다
 
 
+def test_extend_widens_already_collected_tickers_back_to_lookback(g, clock, session_factory):
+    from datetime import date
+
+    from narrative_radar.collectors.prices import DailyBar, Instrument
+
+    g.session.commit()  # 소스 등록(seed)을 반영한다
+    with session_factory.begin() as s:
+        set_status(s, "toss_prices", SourceAccessStatus.LIVE, "test", clock, live_enabled=True)
+    ctx = RunContext(
+        Settings(live_collection_enabled=True, author_hash_salt=SALT),
+        session_factory,
+        clock,
+        "toss_prices",
+    )
+
+    class FakeSource:
+        def __init__(self):
+            self.client = PoliteClient("NarrativeRadar/test")
+            self.asked = []
+
+        def daily_bars(self, inst, since):
+            self.asked.append(since)
+            return [DailyBar(inst.canonical_key, "US", date(2026, 10, 14), 1, 1, 1, 1, 1, "USD")]
+
+    inst = Instrument("US:NVDA", "US", US_CODE, "USD")
+    today = clock.now().date()
+    src = FakeSource()
+    for extend in (False, False, True):
+        with ctx.run(RunKind.COLLECT, {}) as run_id:
+            collect_prices(ctx, src, run_id, [inst], 365, extend=extend)
+    # 처음: lookback, 다음: 마지막 봉 근처만, extend: 다시 lookback까지
+    assert src.asked[0] == today - timedelta(365)
+    assert src.asked[1] > date(2026, 10, 1)
+    assert src.asked[2] == today - timedelta(365)
+
+
 def test_prices_are_refused_until_the_source_is_enabled(g, clock, session_factory):
     g.session.commit()
     ctx = RunContext(

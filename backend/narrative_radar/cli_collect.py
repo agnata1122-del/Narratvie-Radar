@@ -211,6 +211,9 @@ def collect_prices_cmd(
         max=1000,
         help="처음 받는 종목이 거슬러 올라갈 날 수. 기본: NR_PRICE_LOOKBACK_DAYS",
     ),
+    extend: bool = typer.Option(
+        False, help="이미 받은 종목도 lookback-days까지 과거로 넓힌다 (한 번만 쓴다)"
+    ),
 ) -> None:
     """관심사 트리에 있는 미국·한국 종목의 일봉을 받는다 (토스증권 웹 시세, D27)."""
     from narrative_radar.collectors.guard import CollectionBlocked
@@ -245,6 +248,7 @@ def collect_prices_cmd(
                 instruments,
                 lookback_days or settings.price_lookback_days,
                 report,
+                extend=extend,
             )
     except CollectionBlocked as e:
         _stopped(e)
