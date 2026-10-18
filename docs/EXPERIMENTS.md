@@ -159,7 +159,7 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 
 ### 외부 자료에서 빌리는 원칙 (설치·실행하지 않음)
 
-소유자가 제시한 외부 스킬(evidence ledger 계열, 논증 분해 계열, Anthropic Skills 구성 방식)에서 **원칙만** 가져온다. 해당 저장소는 이번 점검에서 원문을 확인하지 못했으므로 지침을 복사하지 않는다.
+소유자가 제시한 외부 스킬(evidence ledger 계열, 논증 분해 계열, Anthropic Skills 구성 방식)에서 **원칙만** 가져온다. `wanshuiyin/Anti-Autoresearch`의 `evidence-ledger`(MIT)는 원문을 읽었다(2026-10-18): 논문 무결성 감사용이라(PDF·LaTeX·저장소 입력, `Bash(*)` 권한, Codex MCP 의존) 설치하지 않고, "발췌 없으면 주장 없음", "모델은 추가만 하고 판정하지 않음", "다른 모델이 새 대화에서 추가 추출 → 코드가 발췌를 검증해 통과분만 합침", "상관→인과 비약은 'therefore' 같은 연결어까지 발췌에 포함"만 참고한다.
 
 1. **인과 근거 수준**: 원문이 인과를 어떻게 뒷받침하는가 — 메커니즘 서술 / 상관 / 시간적 선후 / 단순 인접 / 추측. `AFFECTS`·`CLAIMED_CAUSE_OF` 남용을 이 수준으로 가른다.
 2. **주장 분해**: 주장 · 근거 · 가정 · 반론 · 한계를 나눈다. 글 사이의 지지·반박은 기존 내러티브 `supports/contradicts`에 잇는다.
