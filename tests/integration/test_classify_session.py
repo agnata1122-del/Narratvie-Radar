@@ -90,7 +90,7 @@ def test_export_writes_documents_with_parent_context_and_ontology(session, clock
     nvidia = next(n for n in ctx["ontology"]["nodes"] if n["canonical_key"] == "US:NVDA")
     assert "엔비디아" in nvidia["aliases"]
     # 공통 지침 + 팩 보충 지침, 팩 버전이 붙은 지침 버전, 이 팩을 쓰는 관심사
-    assert ctx["prompt_version"] == "classification.v2+finance.v1"
+    assert ctx["prompt_version"] == "classification.v2+finance.v2"
     assert ctx["domain"]["id"] == "finance"
     names = [p.rsplit("/", 1)[-1] for p in ctx["guidelines"]]
     assert names == ["classification_v2.md", "finance.md"]

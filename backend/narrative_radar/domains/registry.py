@@ -16,7 +16,7 @@ GENERAL = DomainPack(
 FINANCE = DomainPack(
     id="finance",
     name="금융·투자",
-    version="finance.v1",
+    version="finance.v2",
     description="상장사·산업 키, 투자 커뮤니티 은어, 가격 겹쳐 보기·섀도 트레이딩 렌즈.",
     extra_key_patterns={
         # 상장사는 국가:티커. 예전 키(COMPANY:슬러그)도 읽는다.
