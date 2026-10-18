@@ -106,7 +106,7 @@ def main() -> None:
         "input_tokens_guidelines_per_batch": guideline_tokens,
         "input_tokens_total": input_tokens + guideline_tokens * batches,
         "output_tokens_total": OUTPUT_TOKENS_PER_DOC * len(ids),
-        "assumptions": "영어 4자=1토큰, 한글 1자=1토큰, 출력 글당 250토큰, 배치마다 지침을 한 번 읽음",
+        "assumptions": "영어 4자=1토큰, 한글 1자=1토큰, 출력 글당 250토큰, 배치마다 지침 1회",
     }
     manifest = args.manifest.read_bytes()
     commit = subprocess.run(
