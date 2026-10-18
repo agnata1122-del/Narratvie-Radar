@@ -85,3 +85,10 @@ uv run nr classify pending --ids-file data/work/e1/ids.txt --limit 50
 uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 # 3. 분류 결과를 담은 스냅숏을 저장한다 (분류 결과도 원문과 같은 비공개 저장소에만)
 ```
+
+### 파일럿 (2026-10-18)
+
+- 대상: `ids.txt`의 처음 50건 (게시 2025-10-20 – 11-10, HN·Reddit). 모델 Haiku 5.5 (Claude Code 보조 에이전트), 지침 `classification.v2+finance.v1`.
+- 검증: 기준 스냅숏 사본에서 `nr classify ingest` → accepted 50, review 0, errors 0. 발췌 50건 중 원문 그대로 아닌 것 0.
+- 산출물: 데이터 저장소 `e1-results` 브랜치(`e1-base`에서 갈라짐) `experiments/e1/` — 대상 목록, 메타, 파일럿 입력·출력, 실행 기록. 운영 스냅숏(`main`)에는 넣지 않았다.
+- 확인된 문제: 상장사 일부를 티커 대신 `ORG:` 키로 씀(Google·Microsoft·Broadcom·Qualcomm), 주가 상대 성과를 `COMPETES_WITH`로 기록한 사례, 태도(`stance`)가 NVIDIA 기준이라 메모리 종목 방향은 주장별 태도로만 읽힘. 전체 분류 전에 지침 보충 여부를 정한다.
