@@ -165,6 +165,12 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 2. **주장 분해**: 주장 · 근거 · 가정 · 반론 · 한계를 나눈다. 글 사이의 지지·반박은 기존 내러티브 `supports/contradicts`에 잇는다.
 3. **단계 분리**: 추출 → 근거 검증(원문이 그 관계를 함의하는가, NLI 방식) → 그래프 반영. 한 프롬프트에 몰지 않는다.
 
+추가 탐색(2026-10-18, 파일을 읽어 확인, 설치·실행 안 함): 인과 사슬을 방향·조건·양태·근거 수준까지 뽑는 공개 스킬은 찾지 못했다. 참고할 원칙만 둔다.
+- `jwynia/agent-skills` claim-investigation·fact-check (MIT): 주장을 ENTITY/EVENT/STATE/PROCESS/CAUSATION으로 쪼갬, "Causation Collapse"(X와 Y가 각각 있다고 "X because Y"를 받아들이는 것) 금지, 판정 Confirmed/Partially/Not found/Contradicted, 같은 원출처 반복은 독립 근거로 세지 않음.
+- `product-on-purpose/thinking-framework-skills` (Apache-2.0): 근거/추론/가정 구분("그럴듯함은 검증이 아니다"), Walton 논증 도식의 "원인→결과" 비판 질문.
+- 지식 그래프 추출 패턴(shawngraham gist): 추출 → 검증 → 조정 3단계, 닫힌 술어 목록, 글쓴이 주장과 남의 말 인용 구분, 모순은 오류가 아니라 데이터로 기록.
+- 평가 자료 후보: Causal News Corpus(CC0, 원인·결과·신호 구간 표시), 근거 검증용 NLI 모델(MiniCheck, DeBERTa-v3 NLI — 라이선스 미확인).
+
 ### 추출 규약 v3 초안 (기존 그래프 구조 유지)
 
 - **사건**: 개체에 붙는 상태 변화로 표현한다. `{개체, 변수, 방향, 시제·양태}`.
