@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sheets": {
+    "eval": {
+      "title": "무작위 50건 (E1 판정)",
+      "help": "E1 판정의 70% 기준은 '주장'과 '태도' 정확도에만 적용한다. 개체·전체는 함께 기록하는 보조 값이다.",
+      "source": "eval/eval_sample.jsonl",
+      "key": ["no", "document_id"],
+      "section": "number",
+      "fields": [
+        {"name": "label_entities", "label": "개체", "options": [[1, "맞음"], [0, "틀림"], [null, "해당 없음"]]},
+        {"name": "label_claims", "label": "주장", "options": [[1, "맞음"], [0, "틀림"], [null, "해당 없음"]], "gate": true},
+        {"name": "label_stance", "label": "태도", "options": [[1, "맞음"], [0, "틀림"], [null, "해당 없음"]], "gate": true},
+        {"name": "label_overall", "label": "전체", "options": [[1, "맞음"], [0, "틀림"]]}
+      ],
+      "note": "note"
+    },
+    "claims": {
+      "title": "주장 표본 50개 (보조 평가)",
+      "help": "E1 공식 기준과 섞지 않는 보조 평가다. 인과·방향은 영향·원인 관계(AFFECTS, CLAIMED_CAUSE_OF)일 때만 표시한다.",
+      "source": "eval/claims_sample.jsonl",
+      "key": ["no", "document_id", "claim_index"],
+      "section": "number",
+      "fields": [
+        {"name": "label_subject", "label": "주어", "options": [[1, "맞음"], [0, "틀림"]]},
+        {"name": "label_object", "label": "목적어", "options": [[1, "맞음"], [0, "틀림"]]},
+        {"name": "label_predicate", "label": "관계", "options": [[1, "맞음"], [0, "틀림"]]},
+        {"name": "label_causal", "label": "인과·방향", "options": [[1, "맞음"], [0, "틀림"], [null, "해당 없음"]]},
+        {"name": "label_stance", "label": "태도", "options": [[1, "맞음"], [0, "틀림"], [null, "해당 없음"]]}
+      ],
+      "note": "note"
+    },
+    "review": {
+      "title": "review 67건",
+      "help": "AI 제안은 참고용이다. 키만 틀리고 원문 관계가 맞으면 '키 수정 후 승인'.",
+      "source": "review/review_priority.jsonl",
+      "key": ["document_id"],
+      "section": "doc_id",
+      "fields": [
+        {"name": "owner_decision", "label": "판정", "options": [["approve", "승인"], ["approve_with_key_fix", "키 수정 후 승인"], ["keep_review", "보류"], ["reject", "제외"]]}
+      ],
+      "note": "owner_note"
+    }
+  }
+}

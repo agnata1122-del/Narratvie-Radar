@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E1 판정 입력</title>
+<style>
+:root{--bg:#fafaf9;--card:#fff;--ink:#1c1917;--muted:#78716c;--line:#e7e5e4;--accent:#2563eb;--done:#16a34a;--sel:#dbeafe}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1c1917;--card:#262321;--ink:#f5f5f4;--muted:#a8a29e;--line:#3f3b38;--accent:#60a5fa;--done:#4ade80;--sel:#1e3a5f}}
+:root[data-theme="dark"]{--bg:#1c1917;--card:#262321;--ink:#f5f5f4;--muted:#a8a29e;--line:#3f3b38;--accent:#60a5fa;--done:#4ade80;--sel:#1e3a5f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:2}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button,.bar button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
+.tabs button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}.bar .prog{color:var(--muted);margin-right:auto}
+main{max-width:860px;margin:0 auto;padding:16px}
+.help{color:var(--muted);margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px}
+.card.done{border-left:4px solid var(--done)}
+.body{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.body pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin:6px 0}
+.body h2,.body h3{font-size:16px;margin:0 0 6px}
+.group{font-weight:700;margin:18px 0 8px;color:var(--muted)}
+.field{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.field .name{min-width:72px;font-weight:600}.field .gate{font-size:12px;color:var(--accent)}
+.field label{border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.field input{display:none}.field input:checked+span{font-weight:700}
+.field label:has(input:checked){background:var(--sel);border-color:var(--accent)}
+details{margin-top:8px;color:var(--muted)}details pre.orig{white-space:pre-wrap;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+textarea{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg);color:var(--ink);font:inherit;min-height:38px}
+.filter{margin-left:8px;color:var(--muted)}
+</style></head><body>
+<header><div class="tabs" id="tabs"></div>
+<div class="bar"><span class="prog" id="prog"></span>
+<label class="filter"><input type="checkbox" id="todo"> 미완료만</label>
+<button id="export">JSON 내보내기</button><button id="copy">복사</button><button id="import">불러오기</button>
+<input type="file" id="file" accept="application/json" hidden></div></header>
+<main id="main"></main>
+<script>
+const DATA = __DATA__;
+const STORE = "nr-e1-labels-v" + DATA.version;
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (e) { state = {}; }
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} };
+let cur = DATA.sheets[0] ? DATA.sheets[0].name : null;
+const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function md(s){ // 아주 작은 변환: 코드 블록, 제목, 굵게
+  const parts = s.split(/```[a-z]*\n?/); let out = "";
+  parts.forEach((p,i)=>{ if(i%2){ out += "<pre>"+esc(p)+"</pre>"; } else {
+    out += esc(p).replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); } });
+  return out;
+}
+const sheet = () => DATA.sheets.find(s => s.name === cur);
+const entry = (sh, key) => ((state[sh] = state[sh] || {})[key] = state[sh][key] || {labels:{}, note:""});
+const isDone = (sh, it) => { const e = (state[sh.name]||{})[it.key]; return !!e && sh.spec.fields.every(f => f.name in e.labels); };
+function tabs(){
+  const t = document.getElementById("tabs"); t.innerHTML = "";
+  DATA.sheets.forEach(sh => { const b = document.createElement("button");
+    const n = sh.items.filter(it => isDone(sh,it)).length;
+    b.textContent = `${sh.spec.title} (${n}/${sh.items.length})`; b.className = sh.name===cur ? "on" : "";
+    b.onclick = () => { cur = sh.name; render(); window.scrollTo(0,0); }; t.appendChild(b); });
+}
+function render(){
+  tabs(); const sh = sheet(); const m = document.getElementById("main"); m.innerHTML = "";
+  if(!sh) return;
+  const h = document.createElement("p"); h.className="help"; h.textContent = sh.spec.help; m.appendChild(h);
+  const todo = document.getElementById("todo").checked; let lastGroup = null;
+  sh.items.forEach(it => {
+    if(todo && isDone(sh,it)) return;
+    if(it.group && it.group !== lastGroup){ lastGroup = it.group; const g=document.createElement("div"); g.className="group"; g.textContent=it.group; m.appendChild(g); }
+    const c = document.createElement("div"); c.className = "card" + (isDone(sh,it) ? " done" : "");
+    const b = document.createElement("div"); b.className="body"; b.innerHTML = md(it.text); c.appendChild(b);
+    if(it.original){ const d = document.createElement("details"); d.innerHTML = "<summary>원문 전체 (영어)</summary><pre class=\"orig\"></pre>";
+      d.querySelector("pre").textContent = it.original; c.appendChild(d); }
+    const e = (state[sh.name]||{})[it.key] || {labels:{}, note:""};
+    sh.spec.fields.forEach(f => {
+      const row = document.createElement("div"); row.className="field";
+      row.innerHTML = `<span class="name">${esc(f.label)}</span>` + (f.gate ? `<span class="gate">기준</span>` : "");
+      f.options.forEach(([val,lab]) => {
+        const l = document.createElement("label"); const inp = document.createElement("input");
+        inp.type="radio"; inp.name = it.key+"::"+f.name; inp.checked = (f.name in e.labels) && e.labels[f.name] === val;
+        inp.onchange = () => { entry(sh.name,it.key).labels[f.name] = val; save(); c.className = "card" + (isDone(sh,it) ? " done" : ""); tabs(); prog(); };
+        const sp = document.createElement("span"); sp.textContent = lab; l.append(inp, sp); row.appendChild(l); });
+      c.appendChild(row); });
+    const ta = document.createElement("textarea"); ta.placeholder="메모"; ta.value = e.note || "";
+    ta.oninput = () => { entry(sh.name,it.key).note = ta.value; save(); }; c.appendChild(ta);
+    m.appendChild(c); });
+  prog();
+}
+function prog(){ const sh = sheet(); if(!sh) return; const n = sh.items.filter(it=>isDone(sh,it)).length;
+  document.getElementById("prog").textContent = `${sh.spec.title}: ${n}/${sh.items.length} 완료`; }
+function exported(){ const out = {version: DATA.version, exported_at: new Date().toISOString(), sheets:{}};
+  DATA.sheets.forEach(sh => { out.sheets[sh.name] = sh.items.filter(it => (state[sh.name]||{})[it.key])
+    .map(it => ({key: it.key, ids: it.ids, labels: state[sh.name][it.key].labels, note: state[sh.name][it.key].note || ""})); });
+  return JSON.stringify(out, null, 1); }
+document.getElementById("export").onclick = () => { const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([exported()], {type:"application/json"})); a.download = "e1_labels.json"; a.click(); };
+document.getElementById("copy").onclick = async () => { try { await navigator.clipboard.writeText(exported()); alert("복사했습니다"); } catch(e) { prompt("아래 내용을 복사하세요", exported()); } };
+document.getElementById("import").onclick = () => document.getElementById("file").click();
+document.getElementById("file").onchange = ev => { const f = ev.target.files[0]; if(!f) return; f.text().then(t => {
+  const d = JSON.parse(t); Object.entries(d.sheets||{}).forEach(([name, arr]) => arr.forEach(e => {
+    (state[name] = state[name] || {})[e.key] = {labels: e.labels || {}, note: e.note || ""}; })); save(); render(); }); };
+document.getElementById("todo").onchange = render;
+render();
+</script></body></html>
