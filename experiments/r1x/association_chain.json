@@ -1,0 +1,14 @@
+{
+  "version": "assoc-chain.v1",
+  "status": "hypothesis",
+  "note": "소유자가 정한 MVP 사례(D27·D30)의 연상 경로. 검증된 사실이 아니라 탐색 가설 경로다. 연상 층은 이 경로 위의 어느 지점을 글이 건드리는지만 표시한다.",
+  "nodes": [
+    {"id": "N1", "label": "AI 가속기 수요 (NVIDIA 등 GPU·AI 칩)", "keys": ["US:NVDA", "US:AMD", "TECH:gpu"]},
+    {"id": "N2", "label": "HBM 수요·공급", "keys": ["TECH:hbm"]},
+    {"id": "N3", "label": "메모리 3사 생산능력·HBM 전환 (SK하이닉스·삼성전자·Micron)", "keys": ["KR:000660", "KR:005930", "US:MU"]},
+    {"id": "N4", "label": "범용 DRAM·DDR·NAND 공급", "keys": ["TECH:dram", "TECH:ddr5", "TECH:ddr", "TECH:nand"]},
+    {"id": "N5", "label": "메모리 가격", "keys": []},
+    {"id": "N6", "label": "PC·스마트폰·서버 등 수요처 비용·출하", "keys": []}
+  ],
+  "path": ["N1", "N2", "N3", "N4", "N5", "N6"]
+}
