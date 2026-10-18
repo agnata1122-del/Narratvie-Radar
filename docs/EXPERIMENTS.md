@@ -99,3 +99,15 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 - 파일럿 1 재검토: 바뀐 규칙에 걸린 15건만 규칙대로 고침(키 9건, 관계 삭제 7개, 식별자 불확실 3건은 검토로). 재검증 accepted 46, review 4, errors 0.
 - 파일럿 2: 남은 대상에서 시드 20261018로 50건 추출, v2로 분류. accepted 42, review 8, errors 0. 주장 12개 중 v2 규칙 위반 0, 의미 오류 2(주어 잘못·원인 잘못 연결), 약한 관계 2. 키 1건(`NL:ASML`)은 모델이 확실하지 않다고 하면서 지정함.
 - 산출물: 데이터 저장소 `e1-results` 브랜치 `experiments/e1/pilot/`, `pilot2/`.
+
+### 전체 분류 (2026-10-18, 조건부 승인)
+
+- 범위: 파일럿 1을 뺀 1,854건(파일럿 2 50건 + 배치 37개 1,804건). 모델 Haiku 5.5, 지침 `classification.v2+finance.v2`, 배치마다 `nr classify ingest`로 검증. 실패 0.
+- 자동 탐지(`experiments/e1/batches.py flag`): 상장사 `ORG:` 키, 확인 목록에 없는 티커, 발췌에 주어·목적어가 없음, 인과 표현 없는 `CLAIMED_CAUSE_OF`, 자회사↔모회사 관계. 관계는 지우지 않고 review로만 표시한다.
+- **review 글은 보존하고, 사람이 승인하기 전까지 N1·N2에서 뺀다.**
+- 결과(대상 1,904건 전체): accepted 1,715, review 189(모델 판단만 54, 자동 탐지만 129, 둘 다 6). 노이즈 309.
+- N1·N2 분석 가능 표본(accepted, 메모리 3사·메모리 기술이 주어나 목적어인 주장): 글 147건(93일), 주장 158개 중 방향 있는 주장 64개(긍정 29, 부정 35). review로 빠진 글 중 메모리 주장이 있는 글 67건.
+- 비용: 에이전트 토큰 약 481만, 실행 133분, API 환산 약 $0.66(추정).
+- 자동 탐지로 못 잡는 위반: `RELATED_TO` 6개 남음, 키를 못 정한 회사를 검토 대신 빼 버린 사례(ASML·Infineon·Sandisk 등).
+- 평가 표본: 무작위 50건(시드 20261019, `experiments/e1/summarize.py sample`). 소유자 표시 전까지 N1·N2 결과를 판단에 쓰지 않는다(70% 기준 그대로).
+- 산출물: 데이터 저장소 `e1-results` 브랜치 `experiments/e1/full/`(배치별 입력·출력·탐지 사유, ledger, 토큰, 요약), `eval/`(표본, 표시용 시트). `e1-base`와 대상 목록은 바꾸지 않았다.
