@@ -111,3 +111,9 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 - 자동 탐지로 못 잡는 위반: `RELATED_TO` 6개 남음, 키를 못 정한 회사를 검토 대신 빼 버린 사례(ASML·Infineon·Sandisk 등).
 - 평가 표본: 무작위 50건(시드 20261019, `experiments/e1/summarize.py sample`). 소유자 표시 전까지 N1·N2 결과를 판단에 쓰지 않는다(70% 기준 그대로).
 - 산출물: 데이터 저장소 `e1-results` 브랜치 `experiments/e1/full/`(배치별 입력·출력·탐지 사유, ledger, 토큰, 요약), `eval/`(표본, 표시용 시트). `e1-base`와 대상 목록은 바꾸지 않았다.
+
+### 품질 검증 자료 (2026-10-18)
+
+- 기존 무작위 50건(`eval/eval_sample.jsonl`)과 70% 기준은 그대로다. 판정은 이것으로만 한다.
+- 보조: accepted 주장 211개 중 무작위 50개(시드 20261020, 메모리 주장 38개, `eval/claims_sheet.md`). 주어·목적어·관계·인과(방향)·태도를 따로 표시한다. 50건 표본에 주장이 6건뿐이라 주장 정확성을 보려고 만든 것이며 기준을 바꾸지 않는다.
+- review 중 메모리 주장 글 67건(`review/review_memory_sheet.md`, `experiments/e1/review_prep.py triage`): 식별자 사유만 있고 탐지 오탐으로 보이는 글 16건(비상장 CXMT·SpaceX의 `ORG:` 키, 목록에 없던 맞는 티커)은 빠른 확인, 나머지 51건(발췌 밖 주어·목적어 42건, 인과 근거 8건 등)은 내용 검토. 실제 상장사 식별자 오류는 0건, 상장사인데 키를 정하지 못한 경우 4건(Kioxia·ADATA·SMIC). 승인된 글만 N1·N2에 더한다.
