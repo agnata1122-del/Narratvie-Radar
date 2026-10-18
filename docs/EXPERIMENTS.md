@@ -92,3 +92,10 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 - 검증: 기준 스냅숏 사본에서 `nr classify ingest` → accepted 50, review 0, errors 0. 발췌 50건 중 원문 그대로 아닌 것 0.
 - 산출물: 데이터 저장소 `e1-results` 브랜치(`e1-base`에서 갈라짐) `experiments/e1/` — 대상 목록, 메타, 파일럿 입력·출력, 실행 기록. 운영 스냅숏(`main`)에는 넣지 않았다.
 - 확인된 문제: 상장사 일부를 티커 대신 `ORG:` 키로 씀(Google·Microsoft·Broadcom·Qualcomm), 주가 상대 성과를 `COMPETES_WITH`로 기록한 사례, 태도(`stance`)가 NVIDIA 기준이라 메모리 종목 방향은 주장별 태도로만 읽힘. 전체 분류 전에 지침 보충 여부를 정한다.
+
+### finance.v2 반영 (2026-10-18)
+
+- 금융 팩 지침 v2(`3383598`): 등록된 표준 키 우선·불확실하면 검토, 비교·상대 성과·동시 언급으로 관계 금지, `RELATED_TO` 채우기 금지.
+- 파일럿 1 재검토: 바뀐 규칙에 걸린 15건만 규칙대로 고침(키 9건, 관계 삭제 7개, 식별자 불확실 3건은 검토로). 재검증 accepted 46, review 4, errors 0.
+- 파일럿 2: 남은 대상에서 시드 20261018로 50건 추출, v2로 분류. accepted 42, review 8, errors 0. 주장 12개 중 v2 규칙 위반 0, 의미 오류 2(주어 잘못·원인 잘못 연결), 약한 관계 2. 키 1건(`NL:ASML`)은 모델이 확실하지 않다고 하면서 지정함.
+- 산출물: 데이터 저장소 `e1-results` 브랜치 `experiments/e1/pilot/`, `pilot2/`.
