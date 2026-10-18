@@ -38,14 +38,22 @@ def classify_pending(
     limit: int = typer.Option(50, min=1, max=500, help="한 번에 내보낼 글 수"),
     out_dir: Path = typer.Option(Path("data/work/classify"), help="내보낼 폴더"),
     domain: str | None = DOMAIN_OPTION,
+    ids_file: Path | None = typer.Option(
+        None, exists=True, dir_okay=False, help="이 파일의 글 ID(한 줄에 하나) 중에서만 내보낸다"
+    ),
 ) -> None:
     """분류할 글(batch.jsonl)과 온톨로지·지침(context.json)을 내보낸다."""
     from narrative_radar.classifiers.session import export_batch, guidelines_for
     from narrative_radar.core.clock import SystemClock
 
+    only_ids = (
+        {line.strip() for line in ids_file.read_text(encoding="utf-8").splitlines() if line.strip()}
+        if ids_file
+        else None
+    )
     with _sessions()() as session:
         pack = _pack(session, domain)
-        batch, context, n = export_batch(session, SystemClock(), limit, out_dir, pack)
+        batch, context, n = export_batch(session, SystemClock(), limit, out_dir, pack, only_ids)
     typer.echo(f"domain: {pack.id} ({pack.name})")
     typer.echo(f"{n} documents → {batch}")
     typer.echo(f"context → {context}")

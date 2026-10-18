@@ -8,7 +8,7 @@
 """
 
 import json
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -64,9 +64,14 @@ MAX_CONTEXT_NODES = 400
 
 
 def pending_documents(
-    session: Session, limit: int, prompt_version: str = PROMPT_VERSION
+    session: Session,
+    limit: int,
+    prompt_version: str = PROMPT_VERSION,
+    only_ids: Collection[str] | None = None,
 ) -> list[Document]:
-    """이 지침·스키마 버전으로 현재 내용을 아직 분류하지 않은 글. 오류였던 분류는 다시 한다."""
+    """이 지침·스키마 버전으로 현재 내용을 아직 분류하지 않은 글. 오류였던 분류는 다시 한다.
+
+    only_ids를 주면 그 글들 중에서만 고른다 (실험 표본 등)."""
     done = (
         sa.select(ClassificationRun.classification_id)
         .where(
@@ -85,6 +90,7 @@ def pending_documents(
                 Document.deleted_observed_at.is_(None),
                 Document.content_access_status != ContentAccessStatus.METADATA_ONLY,
                 ~done,
+                *([Document.document_id.in_(list(only_ids))] if only_ids is not None else []),
             )
             .order_by(Document.published_at)
             .limit(limit)
@@ -113,11 +119,16 @@ def _tree_keys(session: Session) -> set[str]:
 
 
 def export_batch(
-    session: Session, clock: Clock, limit: int, out_dir: Path, pack: DomainPack
+    session: Session,
+    clock: Clock,
+    limit: int,
+    out_dir: Path,
+    pack: DomainPack,
+    only_ids: Collection[str] | None = None,
 ) -> tuple[Path, Path, int]:
     """batch.jsonl(글)과 context.json(온톨로지·규칙·지침)을 쓴다. 글 수를 돌려준다."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    docs = pending_documents(session, limit, prompt_version_for(pack))
+    docs = pending_documents(session, limit, prompt_version_for(pack), only_ids)
     ontology = load_ontology(session)
     mentioned: set[str] = set()
     parent = aliased(Document)

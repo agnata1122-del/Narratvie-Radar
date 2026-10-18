@@ -230,3 +230,9 @@ def test_ontology_matching_uses_word_boundaries_for_latin_names(session, clock):
     assert ontology.matching("the nvdaq index") == []
     assert ontology.only(["US:NVDA"]).nodes == ontology.nodes
     assert ontology.only([]).nodes == []
+
+
+def test_pending_can_be_limited_to_given_ids(session, clock):
+    _, a, b, _ = _setup(session, clock)
+    assert [d.document_id for d in pending_documents(session, 10, only_ids={b})] == [b]
+    assert pending_documents(session, 10, only_ids=set()) == []
