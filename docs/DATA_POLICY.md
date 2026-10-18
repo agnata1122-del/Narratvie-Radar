@@ -39,7 +39,7 @@
 | **Bluesky** | Jetstream(공개 실시간 스트림, 전체 공개 게시물) | 승인·키 없음 | 사용자가 지운 글은 우리도 지운다([개발자 가이드라인](https://docs.bsky.app/docs/support/developer-guidelines)). 계정이 삭제·정지되면 그 계정 글도 지운다 |
 | **Hacker News** | 공식 API(Firebase), Algolia 검색 API | 키 없음. Algolia는 IP당 시간당 10,000회 | 요청 간격 3초 유지. 삭제(`deleted`)·숨김(`dead`) 처리된 글은 원문을 지운다 |
 
-후보였지만 쓰지 않는 것: Reddit(2026년부터 사전 승인제, 승인 불확실), 네이버 검색 API(신규 신청 중단, 저장·AI 활용 금지 보도), YouTube 댓글(받은 데이터 30일 보관 제한이 시간 이력과 맞지 않음), StockTwits(신규 등록 여부 미확인).
+후보였지만 쓰지 않는 것: Reddit 공식 API(2026년부터 사전 승인제, 승인 불확실. 보관본은 아래 "Reddit 보관본"), 네이버 검색 API(신규 신청 중단, 저장·AI 활용 금지 보도), YouTube 댓글(받은 데이터 30일 보관 제한이 시간 이력과 맞지 않음), StockTwits(신규 등록 여부 미확인).
 
 ### 토스증권 (2026-10-17 추가)
 

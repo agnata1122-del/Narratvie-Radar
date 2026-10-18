@@ -11,9 +11,9 @@
 3. **데이터 보관 저장소**: 세션 사이에 수집 데이터를 보관할 **비공개** GitHub 저장소 `agnata1122-del/narratvie-radar-data`를 만들고 이 환경에 연결한다. 공개 저장소에는 데이터를 올리지 않는다(DATA_POLICY 9). `nr data export`는 이 코드 저장소 안으로는 내보내지 않는다.
 4. **예약 작업**: claude.ai 예약 작업 화면에서 만들고, 저장소는 코드 저장소와 데이터 저장소를 **둘 다** 고른다. 프롬프트는 [ROUTINE_PROMPT.md](ROUTINE_PROMPT.md)를 그대로 쓴다. Claude가 도구로 만든 예약 작업은 새 세션에 저장소를 붙이지 못한다. 그래서 2026-10-17 수동 실행은 데이터 저장소를 받지 못하고 준비 단계에서 멈췄다.
 
-## 주기 설정 (권장값: 3시간마다)
+## 주기 설정
 
-주기가 짧을수록 실시간에 가깝지만 세션 크레딧을 더 쓴다. 3시간 주기 기준 환경변수:
+지금은 Actions가 6시간마다 돈다(`NR_BACKFILL_AFTER_MINUTES=420`, `NR_REVISIT_OFFSETS_MINUTES='[360, 720, 1440]'`, 데이터 저장소 워크플로). 아래는 3시간 주기로 돌릴 때의 예시다:
 
 ```bash
 NR_BACKFILL_AFTER_MINUTES=240           # 4시간 넘게 늦게 본 글만 backfill
@@ -82,3 +82,9 @@ git -C /home/user/narratvie-radar-data push origin main   # 거절되면 pull --
 - 글마다 붙은 `known_nodes`를 먼저 보고 같은 대상이면 그 키를 쓴다. `headline_only` 글은 제목에 나온 것만 분류한다(D26).
 - 한 번에 50건 정도씩 처리하고 `ingest` 결과의 오류 줄을 고쳐 다시 넣는다.
 - `--model`에는 실제로 분류한 세션의 모델 이름을 적는다. 모델이 바뀌면 분류 결과도 달라질 수 있으므로 기록이 필요하다(PRD 16.3-7).
+
+## 소스 점검과 다시 켜기 (D33)
+
+- 정기 워크플로의 마지막 `Verify sources` 단계가 `nr sources verify --expect "$NR_EXPECTED_LIVE"`를 돌린다. 실행이 실패로 표시되면 그 단계 출력의 FAIL 줄이 원인이다. 소스 단계가 실패해도 스냅숏은 저장된다.
+- Bluesky는 소스가 둘이다: `bluesky_jetstream`(스트림)과 `bluesky_appview`(지표 재방문). 따로 멈추고 따로 다시 켠다.
+- 소유자가 소스를 켜거나 끄기로 하면 워크플로의 `NR_EXPECTED_LIVE`도 같이 바꾼다.
