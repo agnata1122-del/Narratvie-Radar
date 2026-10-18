@@ -44,11 +44,12 @@ uv run nr collect prices           # 트리 속 미국·한국 종목의 일봉 
 uv run nr collect reddit           # Reddit 보관본 (D31, reddit_arctic이 live일 때)
 # 과거분은 한 번만: uv run nr collect hackernews-backfill --days 365 / uv run nr collect reddit --days 365
 
-# 2. 분류 (대기열이 빌 때까지 반복)
+# 2. 분류 (대기열이 빌 때까지 반복). 추출 규약 v3가 기본이다 (D38)
 uv run nr classify pending --limit 50
-#    → 세션이 context.json의 guidelines 목록(공통 classification_v2.md + 도메인 팩 보충)에 따라
-#      data/work/classify/out.jsonl을 쓴다. 관심사들이 다른 팩을 쓰면 --domain으로 고른다
-uv run nr classify ingest data/work/classify/out.jsonl --model <세션 모델 이름>
+#    → ① 세션이 extraction_v3.md(+ 도메인 팩의 "키" 절)에 따라 data/work/classify/out.jsonl을 쓴다
+#      ② **다른 대화**가 grounding_v3.md에 따라 같은 글을 근거 검증해 ground.jsonl을 쓴다
+uv run nr classify ingest data/work/classify/out.jsonl --grounding data/work/classify/ground.jsonl --model <세션 모델 이름>
+#    이전 방식(관계만)은 --schema v2 (pending·ingest 둘 다)
 
 # 3. 그래프·위키 갱신
 uv run nr graph build

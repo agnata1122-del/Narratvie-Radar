@@ -12,7 +12,8 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
   │  Document 스키마, content_hash, derivation group
   ▼
 프리필터 → 분류 (classifiers/)
-  │  세션 분류(지침 v2 + 도메인 팩, JSON) → 스키마 검증 → classification_runs (추가만)
+  │  세션 추출(지침 v3: 사건·인과·관계) → 다른 대화의 근거 검증 → 스키마·발췌·판정 검증 → classification_runs (추가만)
+  │  그래프에는 근거 검증을 통과한 관계·인과(mechanism·asserted)만 v2 형식 관계로 넘긴다 (D38)
   ▼
 변경안(ChangeSet) 검증 (graph/, normalization/, discovery/)
   │  개체 정규화, depth, 확장 예산, 근거 요건
@@ -43,7 +44,7 @@ PRD 4장의 계층 구조를 따른다. 이 문서는 실제 코드 위치와 �
 | `backend/narrative_radar/db/` | SQLAlchemy 모델, 세션, 마이그레이션 |
 | `backend/narrative_radar/collectors/` | 소스별 어댑터. `http.py`(유일한 HTTP 클라이언트: 최소 간격, robots.txt, 정직한 UA, GET만), `guard.py`(첫 문제에서 즉시 중단), `author.py`(작성자 HMAC), `gate.py`(수집 허용 조건과 상태 변경), `hackernews.py`, `bluesky.py`(스트림·지표), `reddit.py`(Arctic Shift), `prices.py`(토스 시세), `web.py`(범용) |
 | `backend/narrative_radar/ingest/` | 수집 결과 저장(`store.py`: 중복 방지, 스냅샷, 삭제 반영), 수집 실행기(`runner.py`), 수집 상태 기록, 현황 요약 |
-| `backend/narrative_radar/classifiers/` | 세션 분류 내보내기·검증(`session.py`), 분류 지침(`guidelines/`), 온톨로지 문맥, 규칙 기반 기준 분류기 |
+| `backend/narrative_radar/classifiers/` | 세션 분류 내보내기·검증(`session.py`, v3 추출·근거 검증과 v2), 지침(`guidelines/extraction_v3.md`·`grounding_v3.md`, 이전 `classification_v2.md`), 온톨로지 문맥, 규칙 기반 기준 분류기 |
 | `backend/narrative_radar/graph/` | 그래프 반영: 개체 정규화(`resolve.py`), 변경안(`changeset.py`), 반영과 관계 확정(`builder.py`), 복사 판정 지문(`fingerprint.py`) |
 | `backend/narrative_radar/discovery/` | 관심사 그래프 자동 확장: 탐색 깊이, 하루 예산, 검토 대기 |
 | `backend/narrative_radar/temporal/` | 시점 t의 그래프 상태(`state.py`), 내러티브 상태(`narratives.py`), 달라진 점(`changes.py`) |
