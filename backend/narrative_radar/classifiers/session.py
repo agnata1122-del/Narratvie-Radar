@@ -1,10 +1,11 @@
-"""세션 분류 흐름 (DECISIONS D16).
+"""세션 분류 흐름 (DECISIONS D16, D38).
 
 1. export_batch: 분류할 글과 온톨로지를 파일로 내보낸다.
-2. Claude Code 세션이 guidelines/classification_v2.md(+ 도메인 팩 보충)에 따라
-   ClassificationRecord JSONL을 쓴다.
-3. ingest_records: 스키마와 구조 규칙을 검증해 classification_runs에 저장한다.
-   그래프 반영(M5)은 이 기록을 다시 검증한 뒤에 한다.
+2. Claude Code 세션이 지침에 따라 JSONL을 쓴다.
+   - v3(기본, D38): guidelines/extraction_v3.md로 추출 → 다른 대화에서 grounding_v3.md로 근거 검증
+   - v2: guidelines/classification_v2.md(+ 도메인 팩 보충)
+3. ingest_extractions(v3) / ingest_records(v2): 스키마와 구조 규칙을 검증해 classification_runs에
+   저장한다. 그래프 반영(M5)은 이 기록을 다시 검증한 뒤에 한다.
 """
 
 import json
@@ -30,6 +31,7 @@ from narrative_radar.db.models import (
 )
 from narrative_radar.domains import DomainPack
 from narrative_radar.normalization.text import normalize_text
+from narrative_radar.schemas import extraction
 from narrative_radar.schemas.classification import (
     SCHEMA_VERSION,
     ClassificationOutput,
@@ -47,13 +49,22 @@ PROMPT_VERSION = "classification.v2"
 GUIDELINES = Path(__file__).parent / "guidelines" / "classification_v2.md"
 
 
-def prompt_version_for(pack: DomainPack) -> str:
+# v3: 사건·인과·관계 추출 + 별도 대화 근거 검증 (D38). 도메인 팩은 키 규칙만 쓴다
+EXTRACTION_VERSION = "extraction.v3"
+EXTRACTION_GUIDELINES = Path(__file__).parent / "guidelines" / "extraction_v3.md"
+GROUNDING_GUIDELINES = Path(__file__).parent / "guidelines" / "grounding_v3.md"
+SCHEMAS = {"v2": SCHEMA_VERSION, "v3": extraction.SCHEMA_VERSION}
+
+
+def prompt_version_for(pack: DomainPack, schema: str = "v2") -> str:
     """공통 지침 + 팩 보충 지침의 조합. 둘 중 하나가 바뀌면 다시 분류할 대상이 된다."""
-    return f"{PROMPT_VERSION}+{pack.version}"
+    base = EXTRACTION_VERSION if schema == "v3" else PROMPT_VERSION
+    return f"{base}+{pack.version}"
 
 
-def guidelines_for(pack: DomainPack) -> list[Path]:
-    return [GUIDELINES, *([pack.guideline] if pack.guideline else [])]
+def guidelines_for(pack: DomainPack, schema: str = "v2") -> list[Path]:
+    first = [EXTRACTION_GUIDELINES, GROUNDING_GUIDELINES] if schema == "v3" else [GUIDELINES]
+    return [*first, *([pack.guideline] if pack.guideline else [])]
 
 
 MAX_TEXT_CHARS = 4000
@@ -68,6 +79,7 @@ def pending_documents(
     limit: int,
     prompt_version: str = PROMPT_VERSION,
     only_ids: Collection[str] | None = None,
+    schema_version: str = SCHEMA_VERSION,
 ) -> list[Document]:
     """이 지침·스키마 버전으로 현재 내용을 아직 분류하지 않은 글. 오류였던 분류는 다시 한다.
 
@@ -78,7 +90,7 @@ def pending_documents(
             ClassificationRun.document_id == Document.document_id,
             ClassificationRun.content_hash == Document.content_hash,
             ClassificationRun.prompt_version == prompt_version,
-            ClassificationRun.schema_version == SCHEMA_VERSION,
+            ClassificationRun.schema_version == schema_version,
             ClassificationRun.status != ClassificationStatus.ERROR,
         )
         .exists()
@@ -125,10 +137,13 @@ def export_batch(
     out_dir: Path,
     pack: DomainPack,
     only_ids: Collection[str] | None = None,
+    schema: str = "v2",
 ) -> tuple[Path, Path, int]:
     """batch.jsonl(글)과 context.json(온톨로지·규칙·지침)을 쓴다. 글 수를 돌려준다."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    docs = pending_documents(session, limit, prompt_version_for(pack), only_ids)
+    docs = pending_documents(
+        session, limit, prompt_version_for(pack, schema), only_ids, SCHEMAS[schema]
+    )
     ontology = load_ontology(session)
     mentioned: set[str] = set()
     parent = aliased(Document)
@@ -171,11 +186,11 @@ def export_batch(
     context_path = out_dir / "context.json"
     context = {
         "exported_at": clock.now().isoformat(),
-        "prompt_version": prompt_version_for(pack),
-        "schema_version": SCHEMA_VERSION,
+        "prompt_version": prompt_version_for(pack, schema),
+        "schema_version": SCHEMAS[schema],
         "domain": {"id": pack.id, "name": pack.name, "version": pack.version},
         "interests": _interests(session, pack),
-        "guidelines": [str(g) for g in guidelines_for(pack)],
+        "guidelines": [str(g) for g in guidelines_for(pack, schema)],
         "ontology": ontology.to_dict(pack),
         # 잘렸으면 여기 없는 노드도 있다. 새 키를 만들기 전에 known_nodes와 별칭을 먼저 본다
         "ontology_truncated": truncated,
@@ -300,6 +315,116 @@ def ingest_records(
     return report
 
 
+def ingest_extractions(
+    session: Session,
+    clock: Clock,
+    lines: Iterable[str],
+    grounding_lines: Iterable[str],
+    model: str,
+    run_id: str,
+    prompt_version: str,
+    requested_at: datetime | None = None,
+) -> IngestReport:
+    """v3 추출과 근거 검증 판정을 함께 검증해 저장한다 (D38).
+
+    판정은 `output.grounding`에 붙인다. 판정이 없는 항목은 그래프에 반영되지 않는다.
+    판정 파일에 없는 글은 오류로 본다(검증 없이 저장하지 않는다)."""
+    report = IngestReport()
+    now = clock.now()
+    requested_at = requested_at or now
+    verdicts: dict[str, list[extraction.GroundingVerdict]] = {}
+    for line_no, line in enumerate(grounding_lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            g = extraction.GroundingRecord.model_validate_json(line)
+        except ValidationError as e:
+            report.errors.append(f"grounding line {line_no}: {e.error_count()} schema errors")
+            continue
+        verdicts[g.document_id] = g.verdicts
+    seen: set[str] = set()
+    for line_no, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            record = extraction.ExtractionRecord.model_validate_json(line)
+        except ValidationError as e:
+            report.errors.append(f"line {line_no}: {e.error_count()} schema errors")
+            continue
+        doc = session.get(Document, record.document_id)
+        if doc is None:
+            report.errors.append(f"line {line_no}: unknown document {record.document_id}")
+            continue
+        if doc.deleted_observed_at is not None or doc.content_hash != record.content_hash:
+            report.stale += 1
+            continue
+        if record.document_id in seen:
+            report.duplicates += 1
+            continue
+        seen.add(record.document_id)
+        output = record.output
+        if output.grounding:
+            problems = ["grounding must come from the grounding file, not the extraction"]
+        elif record.document_id not in verdicts:
+            problems = ["no grounding verdicts for this document"]
+        else:
+            output.grounding = verdicts[record.document_id]
+            problems = extraction.structural_errors(output, _source_text(session, doc))
+            problems += _verdict_errors(output)
+        if problems:
+            report.errors.append(f"line {line_no}: " + "; ".join(problems))
+            status, error = ClassificationStatus.ERROR, "; ".join(problems)
+        elif output.needs_review:
+            report.review += 1
+            status, error = ClassificationStatus.REVIEW, None
+        else:
+            report.accepted += 1
+            status, error = ClassificationStatus.ACCEPTED, None
+        _store(
+            session,
+            doc.document_id,
+            record.content_hash,
+            model,
+            run_id,
+            prompt_version,
+            requested_at,
+            now,
+            status,
+            output.model_dump(mode="json"),
+            error,
+            schema_version=extraction.SCHEMA_VERSION,
+        )
+    return report
+
+
+def _source_text(session: Session, doc: Document) -> str:
+    """발췌 대조용: 내보낸 글과 같은 본문 + 상위 글."""
+    text = _text(session, doc)[:MAX_TEXT_CHARS]
+    if doc.parent_external_id:
+        p = session.scalar(
+            sa.select(Document).where(
+                Document.source_adapter_id == doc.source_adapter_id,
+                Document.external_id == doc.parent_external_id,
+            )
+        )
+        if p is not None:
+            text += "\n" + _text(session, p)[:MAX_PARENT_CHARS]
+    return text
+
+
+def _verdict_errors(output: extraction.ExtractionOutput) -> list[str]:
+    """판정이 모든 항목을 정확히 한 번씩 덮는가."""
+    expected = (
+        {("event", i) for i in range(len(output.events))}
+        | {("causal_link", i) for i in range(len(output.causal_links))}
+        | {("claim", i) for i in range(len(output.claims))}
+    )
+    got = [(v.kind, v.index) for v in output.grounding]
+    if len(got) != len(set(got)) or set(got) != expected:
+        return ["grounding verdicts do not cover each item exactly once"]
+    return []
+
+
 def run_baseline(session: Session, clock: Clock, run_id: str, root_key: str, limit: int) -> int:
     """규칙 기반 분류기로 대기 중인 글을 분류해 바로 저장한다."""
     ontology: Ontology = load_ontology(session)
@@ -335,6 +460,7 @@ def _store(
     status: ClassificationStatus,
     output: dict[str, object] | None,
     error: str | None,
+    schema_version: str = SCHEMA_VERSION,
 ) -> None:
     session.add(
         ClassificationRun(
@@ -344,7 +470,7 @@ def _store(
             run_id=run_id,
             model=model,
             prompt_version=prompt_version,
-            schema_version=SCHEMA_VERSION,
+            schema_version=schema_version,
             status=status,
             requested_at=requested_at,
             completed_at=completed_at,

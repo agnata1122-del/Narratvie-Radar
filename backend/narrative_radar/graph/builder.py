@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from narrative_radar.classifiers import rule_based
-from narrative_radar.classifiers.session import PROMPT_VERSION
+from narrative_radar.classifiers.session import EXTRACTION_VERSION, PROMPT_VERSION
 from narrative_radar.core.clock import Clock
 from narrative_radar.core.ids import new_id
 from narrative_radar.db.models import (
@@ -37,6 +37,7 @@ from narrative_radar.graph import fingerprint
 from narrative_radar.graph.changeset import ChangeSet, build_changeset
 from narrative_radar.graph.resolve import EntityResolver, Resolution
 from narrative_radar.normalization.text import normalize_text
+from narrative_radar.schemas import extraction
 from narrative_radar.schemas.classification import ClaimExtract, ClassificationOutput
 from narrative_radar.schemas.enums import (
     AliasOrigin,
@@ -57,14 +58,14 @@ SYMMETRIC = frozenset({EdgeType.COMPETES_WITH, EdgeType.RELATED_TO, EdgeType.CO_
 MAX_COMENTION_NODES = 12
 DERIVATION_WINDOW = timedelta(days=7)
 NARRATIVE_SIMILARITY = 0.85
-# 분류기를 고르는 순서: 세션 분류가 있으면 그것을, 없으면 규칙 기반 기준선을 쓴다.
-# 세션 분류는 도메인 팩 버전을 붙여 기록하므로(`classification.v2+finance.v1`) 접두어로 찾는다.
-CLASSIFIER_PREFERENCE = (PROMPT_VERSION, rule_based.MODEL_LABEL)
+# 분류기를 고르는 순서: v3 추출(D38) → v2 세션 분류 → 규칙 기반 기준선.
+# 세션 분류는 도메인 팩 버전을 붙여 기록하므로(`extraction.v3+finance.v2`) 접두어로 찾는다.
+CLASSIFIER_PREFERENCE = (EXTRACTION_VERSION, PROMPT_VERSION, rule_based.MODEL_LABEL)
 
 
 def _version_filter(version: str) -> sa.ColumnElement[bool]:
     column = ClassificationRun.prompt_version
-    if version == PROMPT_VERSION:
+    if version in (EXTRACTION_VERSION, PROMPT_VERSION):
         return sa.or_(column == version, column.startswith(f"{version}+", autoescape=True))
     return column == version
 
@@ -114,9 +115,23 @@ class GraphBuilder:
     # --- 대기열 ---------------------------------------------------------------------------
 
     def pending(self, limit: int) -> list[tuple[Document, ClassificationRun]]:
+        # 수집은 분류보다 훨씬 많다. 반영할 분류가 있는 글만 고른다 (없는 글이 앞을 막지 않게)
+        classified = (
+            sa.select(ClassificationRun.classification_id)
+            .where(
+                ClassificationRun.document_id == Document.document_id,
+                ClassificationRun.content_hash == Document.content_hash,
+                ClassificationRun.status == ClassificationStatus.ACCEPTED,
+            )
+            .exists()
+        )
         docs = self.session.scalars(
             sa.select(Document)
-            .where(Document.processed_at.is_(None), Document.deleted_observed_at.is_(None))
+            .where(
+                Document.processed_at.is_(None),
+                Document.deleted_observed_at.is_(None),
+                classified,
+            )
             .order_by(Document.published_at)
             .limit(limit * 5)
         ).all()
@@ -150,7 +165,11 @@ class GraphBuilder:
     def apply(self, doc: Document, cls: ClassificationRun) -> ApplyReport:
         now = self.clock.now()
         report = ApplyReport(doc.document_id)
-        output = ClassificationOutput.model_validate(cls.output)
+        if cls.schema_version == extraction.SCHEMA_VERSION:
+            # 근거 검증을 통과한 사건·관계만 v2 형식 관계로 넘긴다 (사건 자체는 기록에 남는다)
+            output = extraction.graph_view(extraction.ExtractionOutput.model_validate(cls.output))
+        else:
+            output = ClassificationOutput.model_validate(cls.output)
         cs: ChangeSet = build_changeset(self.resolver, output, self.min_relevance)
         report.rejected = list(cs.rejected)
         cause = (
