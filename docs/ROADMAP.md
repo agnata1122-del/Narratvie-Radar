@@ -59,3 +59,19 @@ PRD 19장(Phase)과 23장(Step)을 따르되, 섀도 테스트용 포워드 데�
 - 과거 1년 수집은 NVIDIA·메모리 검색어로 받은 것이다. 가지가 새 검색어로 수집을 넓히는 것은 앞으로(포워드)만 가능하고, 과거 검증은 기존 수집 범위 안의 발견만 본다.
 - 시세는 미국·한국만 받는다(D27). TSMC(TW) 같은 노드는 R3에서 "시세 없음"으로 두고 추정하지 않는다.
 - 내러티브 묶음(`Narrative`)은 실데이터에서 0건이다. R3·R4는 노드 단위 시계열로 시작한다.
+
+### R1 우선 개선 대상: 관계 유형 오류 (E1 주장 표본·review에서 확인, 2026-10-18)
+
+지침(finance.v2)에 이미 금지돼 있는데도 Haiku가 어기는 것들이다. 개선은 ① 자동 탐지 규칙으로 review 표시(관계를 지우지 않음) ② 지침에 오류 유형별 예시 추가(해당 글만 재분류) ③ 그래프 확장에서 해당 관계를 따라가지 않기, 순서로 검토한다.
+
+| 오류 | 사례 | 탐지 단서 (안) |
+|---|---|---|
+| 비교 → 경쟁 | "CXMT to match Micron's DRAM capacity" → `COMPETES_WITH`; 가상의 신규 팹 vs 두 회사 | `COMPETES_WITH` + 비교 표현(than·vs·match·compared·bigger·cheaper)만 있고 경쟁 표현(compete·rival·threat·take share)이 없음 |
+| 부품 → 소속 | `HBM PART_OF Apple silicon` | `PART_OF`의 주어가 `TECH:`·제품 부품. 소속은 지분·인수·사업부일 때만 |
+| 공급 예정 → 확정 공급 | Stargate 웨이퍼 계약 → `Samsung SUPPLIES_TO OpenAI` | `SUPPLIES_TO` + 미래·계약 표현(will·deal·agreement·LOI·plan·up to·reportedly·예정·계약) |
+| `RELATED_TO` 남용 | accepted에 6개, `Samsung RELATED_TO Micron` | `RELATED_TO`는 모두 review (지침상 금지) |
+| 비공식 묶음 소속 | `Broadcom BELONGS_TO Mag 10` | `BELONGS_TO` 목적어가 지수·업종이 아닌 별칭 묶음 |
+| 영향 과다 | `HBM AFFECTS Mi300x`(부품), `HBM AFFECTS DRAM`(용량 비교), `Micron AFFECTS Upstate NY`(위치) | `AFFECTS`인데 발췌에 영향·제약·가격 표현이 없음, 목적어가 `PLACE:` |
+| 주어 오인 | 미국의 EUV 장비 금지 → `EUV AFFECTS HBM`; 경쟁사 전용 칩 → `HBM AFFECTS Nvidia` | 기존 "발췌 밖 주어·목적어" 탐지와 함께 사람 확인 |
+
+R1 검증에서 같은 주장 표본 50개를 다시 보고 위 유형 오류가 줄었는지 확인한다(E1 판정과 별개).
