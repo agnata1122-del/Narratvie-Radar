@@ -195,3 +195,4 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 - 채택 기준: 새 표본에서 v3 관계 정확도 ≥ 70%이고 v2보다 10%p 이상 높음, 잘못된 가지 수 감소, 누락률 악화 10%p 이내, review 비율 25% 이하. 하나라도 못 넘으면 v2 유지.
 - AI 예비 판정은 참고로만 쓰고, 판정은 소유자가 한다.
 - 순서: R0 소유자 판정 → R1-X → (채택 시) N2′. 대상별 영향(N2′)은 R1-X가 끝난 뒤 따로 본다. 한 번에 바꾸면 무엇이 효과였는지 가를 수 없다.
+- **준비 완료 (2026-10-18, 실행 전)**: 추출 지침 `experiments/r1x/guideline_v3.md`, 근거 검증 지침 `grounding_v3.md`(별도 대화에서 실행), 표본 추출 `sample.py`. 새 표본 60건(후보 391건, 시드 20261021, HN 56·Reddit 4)과 회귀 표본 49건은 데이터 저장소 `e1-results` 브랜치 `experiments/r1x/`. R0 소유자 판정 뒤 실행한다.
