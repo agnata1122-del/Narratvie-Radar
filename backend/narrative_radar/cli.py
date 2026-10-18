@@ -128,6 +128,32 @@ def sources_report(hours: int = typer.Option(24, help="최근 몇 시간을 볼�
         typer.echo(render(source_report(session, SystemClock().now(), hours)))
 
 
+@sources_app.command("verify")
+def sources_verify(
+    expect: str = typer.Option(..., help="켜져 있어야 할 소스 (쉼표로 구분)"),
+    max_age_hours: float = typer.Option(
+        2.0, help="이 시간 안에 정상 수집 기록이 있어야 한다 (수집 직후 점검이 기본)"
+    ),
+) -> None:
+    """운영 점검: 소스마다 live 상태와 최근 정상 수집 기록을 확인한다.
+
+    하나라도 아니면 종료 코드 1."""
+    from datetime import timedelta
+
+    from narrative_radar.core.clock import SystemClock
+    from narrative_radar.ingest.report import verify_sources
+
+    expected = [s.strip() for s in expect.split(",") if s.strip()]
+    with _sessions()() as session:
+        checks = verify_sources(
+            session, SystemClock().now(), expected, timedelta(hours=max_age_hours)
+        )
+    for c in checks:
+        typer.echo(f"{'OK  ' if c.ok else 'FAIL'}\t{c.source_adapter_id}\t{c.reason}")
+    if not all(c.ok for c in checks):
+        raise typer.Exit(code=1)
+
+
 @sources_app.command("enable")
 def sources_enable(
     source_id: str,

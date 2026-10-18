@@ -8,8 +8,9 @@ from datetime import datetime, timedelta
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from narrative_radar.core.clock import ensure_utc
 from narrative_radar.db.models import Document, DocumentMetricSnapshot, SourceAdapter, SourceHealth
-from narrative_radar.schemas.enums import IngestMode
+from narrative_radar.schemas.enums import IngestMode, SourceAccessStatus, SourceHealthStatus
 
 
 @dataclass
@@ -101,3 +102,41 @@ def source_report(session: Session, now: datetime, hours: int = 24) -> list[Sour
 
 def render(reports: list[SourceReport]) -> str:
     return json.dumps([asdict(r) for r in reports], ensure_ascii=False, indent=2)
+
+
+@dataclass
+class SourceCheck:
+    source_adapter_id: str
+    ok: bool
+    reason: str
+
+
+def verify_sources(
+    session: Session, now: datetime, expected: list[str], max_age: timedelta
+) -> list[SourceCheck]:
+    """운영 점검: 켜져 있어야 할 소스가 live이고, max_age 안에 정상(ok) 수집 기록이 있는가.
+
+    정기 실행의 성공 여부와 별개로 소스마다 판단한다. 소스 단계는 실패해도 다음으로 넘어가므로
+    실행 성공만으로는 소스가 정상인지 알 수 없다.
+    """
+    checks = []
+    for sid in expected:
+        adapter = session.get(SourceAdapter, sid)
+        if adapter is None:
+            checks.append(SourceCheck(sid, False, "unknown source"))
+            continue
+        if adapter.access_status != SourceAccessStatus.LIVE or not adapter.live_enabled:
+            reason = f"{adapter.access_status.value}: {adapter.status_reason or ''}".strip()
+            checks.append(SourceCheck(sid, False, reason[:200]))
+            continue
+        last_ok = session.scalar(
+            sa.select(sa.func.max(SourceHealth.window_end)).where(
+                SourceHealth.source_adapter_id == sid, SourceHealth.status == SourceHealthStatus.OK
+            )
+        )
+        if last_ok is None or now - ensure_utc(last_ok) > max_age:
+            seen = ensure_utc(last_ok).isoformat() if last_ok else "never"
+            checks.append(SourceCheck(sid, False, f"no ok collection since {seen}"))
+            continue
+        checks.append(SourceCheck(sid, True, f"ok at {ensure_utc(last_ok).isoformat()}"))
+    return checks

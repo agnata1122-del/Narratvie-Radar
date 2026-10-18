@@ -433,3 +433,29 @@ def test_revisit_offsets_follow_settings(session_factory, clock):
         assert due_revisits(s, "hackernews", later, offsets=c.revisit_offsets) == []
         later = clock.now() + timedelta(minutes=61)
         assert due_revisits(s, "hackernews", later, offsets=c.revisit_offsets) == ["1"]
+
+
+def test_verify_sources_separates_source_health_from_run_success(session_factory, ctx, clock):
+    from narrative_radar.ingest.report import verify_sources
+
+    c = ctx("hackernews")
+    collector = hn_collector(c, hn_api([STORY], {"1": {"id": 1, "type": "story"}}), clock)
+    with c.run(RunKind.COLLECT, {}) as run_id:
+        hackernews_cycle(c, collector, run_id)
+    with session_factory.begin() as s:
+        set_status(s, "bluesky_jetstream", SourceAccessStatus.STOPPED, "HTTP 504", clock)
+    expected = ["hackernews", "bluesky_jetstream", "bluesky_appview", "nope"]
+    with session_factory() as s:
+        checks = {
+            ch.source_adapter_id: ch
+            for ch in verify_sources(s, clock.now(), expected, timedelta(hours=2))
+        }
+        assert checks["hackernews"].ok
+        assert not checks["bluesky_jetstream"].ok and "504" in checks["bluesky_jetstream"].reason
+        # live이지만 정상 수집 기록이 없다
+        assert not checks["bluesky_appview"].ok and "never" in checks["bluesky_appview"].reason
+        assert not checks["nope"].ok
+        later = verify_sources(
+            s, clock.now() + timedelta(hours=3), ["hackernews"], timedelta(hours=2)
+        )
+        assert not later[0].ok
