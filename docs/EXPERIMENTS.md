@@ -117,3 +117,4 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
 - 기존 무작위 50건(`eval/eval_sample.jsonl`)과 70% 기준은 그대로다. 판정은 이것으로만 한다.
 - 보조: accepted 주장 211개 중 무작위 50개(시드 20261020, 메모리 주장 38개, `eval/claims_sheet.md`). 주어·목적어·관계·인과(방향)·태도를 따로 표시한다. 50건 표본에 주장이 6건뿐이라 주장 정확성을 보려고 만든 것이며 기준을 바꾸지 않는다.
 - review 중 메모리 주장 글 67건(`review/review_memory_sheet.md`, `experiments/e1/review_prep.py triage`): 식별자 사유만 있고 탐지 오탐으로 보이는 글 16건(비상장 CXMT·SpaceX의 `ORG:` 키, 목록에 없던 맞는 티커)은 빠른 확인, 나머지 51건(발췌 밖 주어·목적어 42건, 인과 근거 8건 등)은 내용 검토. 실제 상장사 식별자 오류는 0건, 상장사인데 키를 정하지 못한 경우 4건(Kioxia·ADATA·SMIC). 승인된 글만 N1·N2에 더한다.
+- AI 예비 판정(참고용, 판정 기준 아님, `eval/ai_prelabels/`): 무작위 50건 전체 정확 34/50(68%) — 오류 16건 중 개체 누락 10건, 노이즈 오판 3건. 주장·태도만 보면 45/50(90%). 주장 표본 39/50(78%), 주로 관계 유형 오류(비교를 경쟁으로, 부품을 소속으로, 예정 공급, `RELATED_TO`). review 67건 승인 제안 56·제외 8·보류 3. 소유자 표시로 확정한다.
