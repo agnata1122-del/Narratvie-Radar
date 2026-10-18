@@ -128,3 +128,4 @@ uv run nr classify ingest data/work/classify/out.jsonl --model <모델 이름>
   - 무작위 50건의 개체 누락 10건은 대부분 메모리 주장이 없는 글이다. 그중 2건(DDR→HBM 전환, Micron의 Elpida 인수)은 명시된 관계가 빠져 N1을 줄인다. 노이즈 오판 3건(Micron 매수 글)은 주장이 없어 N1에 영향이 없고, B0(키워드)는 분류와 무관하다.
   - 태도: 메모리 주장 38개 중 태도 오류 2개 → N2 방향 왜곡은 작다.
 - **review 67건 검토 순서**(`review/review_priority.md`, AI 제안으로 일괄 승인하지 않음): A AI 제외 제안 6 → B 보류 3 → C 승인 후보지만 관계 오류 가능(발췌 밖 주어·목적어, 인과 근거) 41 → D 키 수정 후 승인 후보 3(ADATA `TW:3260`, SMIC `HK:0981`, Kioxia `JP:285A`) → E 식별자 오탐만 12 → F 모델 표시 2. 판정 값: approve / approve_with_key_fix / keep_review / reject.
+- 주장 표본 교차 검토(2026-10-18, 참고용, `eval/ai_prelabels/claims_crosscheck.md`): 소유자가 시트를 ChatGPT에 주어 독립 판정을 받았다. 둘 다 오류로 본 것 5개(비교→영향·경쟁, 주어 오인, `RELATED_TO`, 사건→지역). 의견이 갈린 것 7개 — 이 중 `SUPPLIES_TO`가 4개(보유·인증·업계 의존을 공급으로), 결과 사건을 개체로 줄인 `CLAIMED_CAUSE_OF`가 3개. 태도 차이(6 vs 17)는 주장 태도의 기준 대상이 지침에 정해져 있지 않아 생긴다. **N2 계산 전에 주장 태도의 기준(루트·주어·목적어 중 무엇)을 소유자가 정한다.**
