@@ -1,5 +1,7 @@
 """`nr graph …`: 분류 결과를 그래프에 반영하고 관심사 그래프를 확장한다 (M5)."""
 
+from datetime import datetime
+
 import typer
 
 from narrative_radar.core.config import get_settings
@@ -139,3 +141,37 @@ def graph_tiers(
                 f"{tiers[e.edge_id].value:10} {labels[e.source_node_id]} "
                 f"—{e.relation_type.value}→ {labels[e.target_node_id]} ({e.status.value})"
             )
+
+
+@graph_app.command("replay")
+def graph_replay(
+    start: datetime = typer.Option(..., "--from", formats=["%Y-%m-%d"], help="첫 날 (UTC)"),
+    end: datetime = typer.Option(..., "--to", formats=["%Y-%m-%d"], help="마지막 날 (UTC)"),
+    assume_timely: bool = typer.Option(
+        False, help="나중에 모은 과거 글을 게시 시각에 수집·분류했다고 본다"
+    ),
+    min_relevance: float = typer.Option(0.3, min=0, max=1),
+) -> None:
+    """과거 시점 재생: 하루씩 그날 끝까지 알 수 있던 글만 반영하고 자동 확장한다 (D41).
+
+    아무 글도 반영되지 않은 그래프(사본)에서만 돈다. 결과는 사후 재구성 실행으로 남는다."""
+    from narrative_radar.temporal.replay import replay
+
+    with _factory().begin() as session:
+        try:
+            reports = replay(
+                session,
+                start.date(),
+                end.date(),
+                assume_timely=assume_timely,
+                min_relevance=min_relevance,
+            )
+        except ValueError as e:
+            raise typer.BadParameter(str(e)) from None
+    for r in reports:
+        if r.documents or r.admitted or r.pending:
+            typer.echo(
+                f"{r.day} documents={r.documents} applied={r.applied} "
+                f"admitted+={r.admitted} pending+={r.pending}"
+            )
+    typer.echo(f"{len(reports)} days, documents={sum(r.documents for r in reports)}")

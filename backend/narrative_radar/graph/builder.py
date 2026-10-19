@@ -3,6 +3,7 @@
 - 이 단계에서 쓰는 모든 행의 available_at은 처리 시각이다. 과거 상태 복원은 이 값을 기준으로 한다.
 - 이벤트의 원인은 글의 수집 방식으로 정한다: backfill로 받은 글이면 backfill, 아니면 observed_new.
 - 관계는 독립 근거가 기준 이상이면 관측 확정(confirmed)이 된다 (DECISIONS D6).
+- 과거 시점 재생(R2)에서는 as_of를 준다. 그때 알 수 있던 글·분류만 반영한다 (`_known_by`).
 """
 
 import hashlib
@@ -103,12 +104,19 @@ class GraphBuilder:
         run_id: str,
         min_relevance: float = 0.3,
         min_independent_evidence: int = 2,
+        as_of: datetime | None = None,
+        assume_timely: bool = False,
     ) -> None:
+        """as_of: 이 시각까지 알 수 있던 것만 반영한다 (재생). 비우면 지금 있는 것 전부.
+        assume_timely: 재생에서 글을 게시 시각에 수집·분류했다고 본다 (나중에 모은 과거 글용).
+        끄면 수집 시각(observed_at)과 분류 완료 시각도 as_of 이전이어야 한다."""
         self.session = session
         self.clock = clock
         self.run_id = run_id
         self.min_relevance = min_relevance
         self.min_independent_evidence = min_independent_evidence
+        self.as_of = as_of
+        self.assume_timely = assume_timely
         self.resolver = EntityResolver(session)
         self._groups: list[tuple[int, str]] | None = None
 
@@ -122,6 +130,7 @@ class GraphBuilder:
                 ClassificationRun.document_id == Document.document_id,
                 ClassificationRun.content_hash == Document.content_hash,
                 ClassificationRun.status == ClassificationStatus.ACCEPTED,
+                *self._classification_known(),
             )
             .exists()
         )
@@ -131,6 +140,7 @@ class GraphBuilder:
                 Document.processed_at.is_(None),
                 Document.deleted_observed_at.is_(None),
                 classified,
+                *self._document_known(),
             )
             .order_by(Document.published_at)
             .limit(limit * 5)
@@ -153,12 +163,26 @@ class GraphBuilder:
                     ClassificationRun.content_hash == doc.content_hash,
                     _version_filter(version),
                     ClassificationRun.status == ClassificationStatus.ACCEPTED,
+                    *self._classification_known(),
                 )
                 .order_by(ClassificationRun.completed_at.desc())
             ).first()
             if cls is not None:
                 return cls
         return None
+
+    def _document_known(self) -> list[sa.ColumnElement[bool]]:
+        if self.as_of is None:
+            return []
+        out = [Document.published_at <= self.as_of]
+        if not self.assume_timely:
+            out.append(Document.observed_at <= self.as_of)
+        return out
+
+    def _classification_known(self) -> list[sa.ColumnElement[bool]]:
+        if self.as_of is None or self.assume_timely:
+            return []
+        return [ClassificationRun.completed_at <= self.as_of]
 
     # --- 반영 -----------------------------------------------------------------------------
 
