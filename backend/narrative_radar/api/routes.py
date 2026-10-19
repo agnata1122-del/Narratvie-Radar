@@ -34,7 +34,8 @@ from narrative_radar.db.models import (
 )
 from narrative_radar.discovery.branch import BranchError, create_branch, lineage
 from narrative_radar.domains import get_pack
-from narrative_radar.schemas.enums import TargetType, ViewerDecision
+from narrative_radar.graph.evidence import edge_tiers
+from narrative_radar.schemas.enums import EvidenceTier, TargetType, ViewerDecision
 from narrative_radar.schemas.views import SavedViewIn
 from narrative_radar.temporal.changes import observation_gaps, what_changed
 from narrative_radar.temporal.narratives import narrative_state_at
@@ -412,6 +413,10 @@ def build_router(sessions: sessionmaker[Session], clock: Clock) -> APIRouter:
             "source": {"node_id": edge.source_node_id, "label": labels.get(edge.source_node_id)},
             "target": {"node_id": edge.target_node_id, "label": labels.get(edge.target_node_id)},
             "relation": edge.relation_type.value,
+            # 근거 단계 (D39): 확정 여부와 별개로 근거가 공식·보도인지, 의견인지, 추측인지
+            "evidence_tier": edge_tiers(session, [edge.edge_id], as_of=t)
+            .get(edge.edge_id, EvidenceTier.HYPOTHESIS)
+            .value,
             "evidence": [
                 {
                     "document_id": d.document_id,

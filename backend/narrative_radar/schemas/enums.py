@@ -140,6 +140,17 @@ class EventCause(StrEnum):
     USER_ACTION = "user_action"
 
 
+class EvidenceTier(StrEnum):
+    """관계의 근거 단계 (DECISIONS D34, D39). 확정(confirmed, D6)과 따로 읽기 쪽에서 계산한다.
+
+    확정은 "독립 출처 2곳 이상에서 반복 관측"이지 사실이 아니다. 여기서도 사실을 검증하지 않고,
+    근거의 성격만 구분한다."""
+
+    SOURCED = "sourced"  # 사실 확인: 확정 + 공식 출처 근거, 또는 서로 독립인 보도 근거 2곳 이상
+    REPEATED = "repeated"  # 반복 관측: 확정이지만 근거가 의견 위주
+    HYPOTHESIS = "hypothesis"  # 탐색 가설: 후보 관계, 또는 근거가 모두 추측
+
+
 class AliasOrigin(StrEnum):
     SEED = "seed"
     LLM = "llm"
