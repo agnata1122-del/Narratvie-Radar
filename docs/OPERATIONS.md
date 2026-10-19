@@ -58,6 +58,10 @@ uv run nr graph duplicates               # 중복 후보 → 같은 대상이면
 uv run nr graph tiers                    # 관계 근거 단계(사실 확인/반복 관측/탐색 가설)
 uv run nr wiki refresh
 
+# (실험) 과거 시점 재생 (D41): 그래프를 비운 사본에서만. 운영 DB에서 돌리지 않는다
+uv run python experiments/r2/prepare.py SRC.db DST.db --seed-at 2025-10-16
+NR_DB_PATH=DST.db uv run nr graph replay --from 2025-10-16 --to 2026-10-18 --assume-timely
+
 # 4. 점검
 uv run nr sources list
 uv run nr sources report --hours 6
