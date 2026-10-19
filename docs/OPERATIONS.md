@@ -53,6 +53,9 @@ uv run nr classify ingest data/work/classify/out.jsonl --grounding data/work/cla
 
 # 3. 그래프·위키 갱신
 uv run nr graph build
+uv run nr profile review                 # 검토 대기 노드 → nr profile approve|exclude KEY --reason …
+uv run nr graph duplicates               # 중복 후보 → 같은 대상이면 nr graph merge OLD NEW --reason …
+uv run nr graph tiers                    # 관계 근거 단계(사실 확인/반복 관측/탐색 가설)
 uv run nr wiki refresh
 
 # 4. 점검
